@@ -1,4 +1,4 @@
-from .seq2seq_rnn import EncoderRNN, DecoderRNN, Seq2SeqRNN
+from nmt.model.seq2seq_rnn import EncoderRNN, DecoderRNN, Seq2SeqRNN
 
 MODELS = {
     'rnn': (EncoderRNN, DecoderRNN, Seq2SeqRNN),

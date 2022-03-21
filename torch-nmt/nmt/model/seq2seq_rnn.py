@@ -2,6 +2,7 @@ import torch
 import random
 from torch import nn
 
+
 class EncoderRNN(nn.Module):
     def __init__(self, vocab_size, embed_size, num_hiddens, num_layers, dropout):
         super().__init__()

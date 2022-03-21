@@ -1,10 +1,9 @@
 import os
 from torch.utils.data import Dataset
-from .utils.processor import Processor
 
 
 class TatoebaDataset(Dataset):
-    def __init__(self, root_dir='.', split='train', lang_pair=('eng', 'fra'), processor=Processor()):
+    def __init__(self, root_dir='.', split='train', lang_pair=('eng', 'fra'), processor=None):
         self.src_lang, self.tgt_lang = lang_pair
         self.src_text, self.tgt_text = self._read_text(root_dir, lang_pair)
         if isinstance(processor, (list, tuple)):

@@ -1,6 +1,6 @@
-from .bleu import bleu_score
-from .plot import plot_history
-from .model import load_model, save_model
+from nmt.util.bleu import bleu_score
+from nmt.util.plot import plot_history
+from nmt.utl.model import load_model, save_model
 
 
 __all__ = (
