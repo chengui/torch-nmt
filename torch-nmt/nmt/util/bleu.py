@@ -1,11 +1,8 @@
 import math
 import collections
 
-SPTOK = set(['<sos>', '<pad>', '<eos>'])
 
 def bleu_score(conds, refs, max_n=4, weights=[0.25]*4):
-    conds = [[w for w in l if w not in SPTOK] for l in conds]
-    refs = [[w for w in l if w not in SPTOK] for l in refs]
     cond_len, ref_len = 0, 0
     num_match, num_total = [0]*max_n, [0]*max_n
     for (cond, ref) in zip(conds, refs):

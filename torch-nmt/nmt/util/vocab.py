@@ -1,15 +1,20 @@
-import os
-import torch
 import collections
 
-UNK_TOKEN = '<unk>'
-PAD_TOKEN = '<pad>'
-SOS_TOKEN = '<sos>'
-EOS_TOKEN = '<eos>'
 
 class Vocab(object):
-    def __init__(self, tokens=[], min_freq=0, reserved_tokens=[]):
-        self.build(tokens, min_freq, reserved_tokens)
+    UNK_IDX, UNK_TOK = 0, '<unk>'
+    PAD_IDX, PAD_TOK = 1, '<pad>'
+    SOS_IDX, SOS_TOK = 2, '<sos>'
+    EOS_IDX, EOS_TOK = 3, '<eos>'
+
+    def __init__(self, reserved_tokens=[]):
+        self.itos = [
+            Vocab.UNK_TOK,
+            Vocab.PAD_TOK,
+            Vocab.SOS_TOK,
+            Vocab.EOS_TOK,
+        ] + reserved_tokens
+        self.stoi = {v: k for k, v in enumerate(self.itos)}
 
     def __len__(self):
         return len(self.itos)
@@ -17,18 +22,16 @@ class Vocab(object):
     def __getitem__(self, tokens):
         return self.index(tokens)
 
-    def build(self, tokens, min_freq, reserved_tokens):
+    def build(self, tokens, min_freq=2):
         if isinstance(tokens[0], list):
             tokens = [tok for line in tokens for tok in line]
-        self.freqs = collections.Counter(tokens)
-        self.itos = ['<unk>'] + reserved_tokens
-        self.stoi = collections.defaultdict(int)
-        freqs = sorted(self.freqs.items(), key=lambda x: x[1], reverse=True)
+        freqs = collections.Counter(tokens)
+        freqs = sorted(freqs.items(), key=lambda x: x[1], reverse=True)
         for tok, freq in freqs:
             if freq < min_freq:
                 break
+            self.stoi[tok] = len(self.itos)
             self.itos.append(tok)
-        self.stoi.update({v: k for k, v in enumerate(self.itos)})
         return self
 
     def load(self, data):
@@ -41,8 +44,6 @@ class Vocab(object):
         return self
 
     def token(self, indices):
-        if isinstance(indices, torch.Tensor):
-            indices = indices.long().tolist()
         if not isinstance(indices, (list, tuple)):
             return self.itos[indices]
         return [self.itos[index] for index in indices]
@@ -52,25 +53,13 @@ class Vocab(object):
             return self.stoi[tokens]
         return [self.stoi[tok] for tok in tokens]
 
-def load_vocab(self, indir):
-    print(f'Load vocab from {indir}...')
-    src_vocab = Vocab()
-    with open(os.path.join(indir, 'src_vocab.txt'), 'r') as f:
-        data = f.readlines()
-        data = [line.strip().split('\t') for line in data]
-        src_vocab.load(dict(data))
-    tgt_vocab = Vocab()
-    with open(os.path.join(indir, 'tgt_vocab.txt'), 'r') as f:
-        data = f.readlines()
-        data = [line.strip().split('\t') for line in data]
-        tgt_vocab.load(dict(data))
-    return src_vocab, tgt_vocab
+    def to_file(self, filename):
+        with open(filename, 'w') as f:
+            f.write('\n'.join(self.itos))
 
-def save_vocab(self, outdir, src_vocab, tgt_vocab):
-    with open(os.path.join(outdir, 'src_vocab.txt'), 'w') as f:
-        for k, v in enumerate(src_vocab.itos):
-            f.write(f'{v}\t{k}')
-    with open(os.path.join(outdir, 'tgt_vocab.txt'), 'w') as f:
-        for k, v in enumerate(tgt_vocab.itos):
-            f.write(f'{v}\t{k}')
-    print(f'Save vocab to {outdir}...')
+    @classmethod
+    def from_file(cls, filename):
+        vocab = Vocab()
+        with open(filename, 'r') as f:
+            vocab.load([line.strip() for line in f.readlines()])
+        return vocab
