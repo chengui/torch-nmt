@@ -1,5 +1,5 @@
-from .tatoeba import TatoebaDataset
 from torch.utils.data import random_split
+from nmt.dataset.tatoeba import TatoebaDataset
 
 DATASETS = {
     'tatoeba': TatoebaDataset,
