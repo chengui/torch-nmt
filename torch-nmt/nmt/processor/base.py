@@ -1,5 +1,5 @@
 import torch
-from nmt.util.vocab import Vocab, PAD_TOKEN, SOS_TOKEN, EOS_TOKEN
+from nmt.util.vocab import Vocab
 
 
 class Processor(object):
@@ -61,14 +61,15 @@ class BaseProcessor(Processor):
         return [_tokenize(text) for text in texts]
 
     def build_vocab(self, tokens, min_freq=2):
-        reverse_tokens = [PAD_TOKEN, SOS_TOKEN, EOS_TOKEN]
-        return Vocab(tokens, min_freq, reverse_tokens)
+        vocab = Vocab()
+        vocab.build(tokens, min_freq)
+        return vocab
 
     def numerical(self, tokens, vocab, maxlen=None):
         def pad(tokens, maxlen):
             pad_length = max(0, maxlen-len(tokens))
-            pad_tokens = tokens[:maxlen] + [PAD_TOKEN] * pad_length
-            return [SOS_TOKEN] + pad_tokens + [EOS_TOKEN]
+            pad_tokens = tokens[:maxlen] + [Vocab.PAD_TOK] * pad_length
+            return [Vocab.SOS_TOK] + pad_tokens + [Vocab.EOS_TOK]
         if not maxlen:
             maxlen = max(len(l) for l in tokens)
         tokens = [pad(words, maxlen) for words in tokens]
