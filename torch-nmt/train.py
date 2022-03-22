@@ -98,7 +98,6 @@ if __name__ == '__main__':
                              root_dir=args.root_dir,
                              processor=BaseProcessor())
     vocab_size = (len(dataset.src_vocab), len(dataset.tgt_vocab))
-    model = create_model(model=args.model,
-                         vocab_size=vocab_size)
+    model = create_model(model=args.model, vocab_size=vocab_size)
 
     train(model, dataset, args.epochs, args.batch_size, args.lr, args.pretrain, args.outdir)
