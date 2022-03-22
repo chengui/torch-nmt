@@ -7,7 +7,8 @@ class Vocab(object):
     SOS_IDX, SOS_TOK = 2, '<sos>'
     EOS_IDX, EOS_TOK = 3, '<eos>'
 
-    def __init__(self, reserved_tokens=[]):
+    def __init__(self, name=None, reserved_tokens=[]):
+        self.name = name
         self.itos = [
             Vocab.UNK_TOK,
             Vocab.PAD_TOK,
@@ -50,8 +51,8 @@ class Vocab(object):
 
     def index(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self.stoi[tokens]
-        return [self.stoi[tok] for tok in tokens]
+            return self.stoi.get(tokens, 0)
+        return [self.stoi.get(tok, 0) for tok in tokens]
 
     def to_file(self, filename):
         with open(filename, 'w') as f:
