@@ -24,14 +24,28 @@ def save_checkpoint(ptfile, model, optimizer=None):
     torch.save(checkpoint, ptfile)
 
 def load_vocab(indir, src_file='src_vocab.txt', tgt_file='tgt_vocab.txt'):
-    print(f'Loading vocab to {indir}...')
-    src_vocab = Vocab.from_file(os.path.join(indir, src_file))
-    tgt_vocab = Vocab.from_file(os.path.join(indir, tgt_file))
+    src_file = os.path.join(indir, src_file)
+    if os.path.exists(src_file):
+        print(f'Loading src_vocab from {src_file}...')
+        src_vocab = Vocab.from_file(src_file)
+    else:
+        print(f'[WARN] {src_file} not exists')
+    tgt_file = os.path.join(indir, tgt_file)
+    if os.path.exists(tgt_file):
+        print(f'Loading tgt_vocab from {tgt_file}...')
+        tgt_vocab = Vocab.from_file(tgt_file)
+    else:
+        print(f'[WARN] {tgt_file} not exists')
     return src_vocab, tgt_vocab
 
 def save_vocab(src_vocab, tgt_vocab, outdir='.'):
-    print(f'Saving vocab to {outdir}...')
     src_file = src_vocab.name if src_vocab.name else 'src_vocab'
-    src_vocab.to_file(os.path.join(outdir, src_file + '.txt'))
+    src_file = os.path.join(outdir, src_file + '.txt')
+    if not os.path.exists(src_file):
+        print(f'Saving src_vocab to {src_file}...')
+        src_vocab.to_file(src_file)
     tgt_file = tgt_vocab.name if tgt_vocab.name else 'tgt_vocab'
-    tgt_vocab.to_file(os.path.join(outdir, tgt_file + '.txt'))
+    tgt_file = os.path.join(outdir, tgt_file + '.txt')
+    if not os.path.exists(tgt_file):
+        print(f'Saving tgt_vocab to {tgt_file}...')
+        tgt_vocab.to_file(tgt_file)
