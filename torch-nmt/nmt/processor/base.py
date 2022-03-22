@@ -75,7 +75,7 @@ class BaseProcessor(Processor):
         def pad(tokens, maxlen):
             pad_length = max(0, maxlen-len(tokens))
             pad_tokens = [Vocab.SOS_TOK] + tokens + [Vocab.EOS_TOK]
-            pad_tokens = tokens + [Vocab.PAD_TOK] * pad_length
+            pad_tokens = pad_tokens + [Vocab.PAD_TOK] * pad_length
             return pad_tokens[:maxlen]
         if maxlen is None:
             if self.max_seqlen:
