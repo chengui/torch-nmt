@@ -4,6 +4,8 @@ from .vocab import Vocab
 
 
 def load_checkpoint(ptfile, model, optimizer=None):
+    if not os.path.exists(ptfile):
+        return
     print(f'Loading checkpoint from {ptfile}...')
     checkpoint = torch.load(ptfile)
     model.load_state_dict(checkpoint['state_dict'])
