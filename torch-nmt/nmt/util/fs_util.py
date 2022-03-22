@@ -23,7 +23,7 @@ def save_checkpoint(ptfile, model, optimizer=None):
         })
     torch.save(checkpoint, ptfile)
 
-def load_vocab(src_file, tgt_file, indir='.'):
+def load_vocab(indir, src_file='src_vocab.txt', tgt_file='tgt_vocab.txt'):
     print(f'Loading vocab to {indir}...')
     src_vocab = Vocab.from_file(os.path.join(indir, src_file))
     tgt_vocab = Vocab.from_file(os.path.join(indir, tgt_file))
