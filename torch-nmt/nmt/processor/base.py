@@ -3,15 +3,16 @@ from nmt.util.vocab import Vocab
 
 
 class Processor(object):
-    def __call__(self, texts):
-        return self.process(texts)
+    def __call__(self, texts, vocab=None):
+        return self.process(texts, vocab)
 
-    def process(self, texts):
+    def process(self, texts, vocab):
         if not isinstance(texts, (list, tuple)):
             texts = [texts]
         texts = self.preprocess(texts)
         tokens = self.tokenize(texts)
-        vocab = self.build_vocab(tokens)
+        if vocab is None:
+            vocab = self.build_vocab(tokens)
         array = self.numerical(tokens, vocab)
         return array, vocab
 
