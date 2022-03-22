@@ -11,14 +11,14 @@ class TatoebaDataset(Dataset):
             src_processor, tgt_processor = processor
         else:
             src_processor, tgt_processor = processor, processor
+        src_data, self.src_vocab = src_processor(self.src_text)
+        tgt_data, self.tgt_vocab = tgt_processor(self.tgt_text)
         if split == 'train':
-            src_text = self.src_text[:-test_samples]
-            tgt_text = self.tgt_text[:-test_samples]
+            self.src_data = src_data[:-test_samples]
+            self.tgt_data = tgt_data[:-test_samples]
         else:
-            src_text = self.src_text[test_samples:]
-            tgt_text = self.tgt_text[test_samples:]
-        self.src_data, self.src_vocab = src_processor(src_text)
-        self.tgt_data, self.tgt_vocab = tgt_processor(tgt_text)
+            self.src_data = src_data[test_samples:]
+            self.tgt_data = tgt_data[test_samples:]
 
     def __getitem__(self, idx):
         return (self.src_data[idx], self.tgt_data[idx])
