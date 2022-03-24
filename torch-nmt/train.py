@@ -7,6 +7,7 @@ from nmt.dataset import (
     create_dataset,
     split_dataset
 )
+from nmt.util.grad import clip_grad
 from nmt.util.fs_util import (
     load_checkpoint,
     save_checkpoint,
@@ -39,8 +40,8 @@ def train_epoch(model, data_iter, criterion, optimizer):
         pred = pred.permute(0, 2, 1)
         loss = criterion(pred[:, :, 1:], tgt[:, 1:])
         loss.backward()
-        #clip_grad
-        nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
+        # clip grad
+        clip_grad(model, 1)
         optimizer.step()
         train_loss += loss.item()
     train_loss /= len(data_iter)
