@@ -51,8 +51,12 @@ def train(model, dataset, num_epochs, batch_size, lr, pretrain, outdir):
     src_vocab, tgt_vocab =  dataset.src_vocab, dataset.tgt_vocab
     trainset, validset = split_dataset(dataset, ratios=[0.8, 0.2])
 
-    train_iter = DataLoader(dataset=trainset, batch_size=batch_size)
-    valid_iter = DataLoader(dataset=validset, batch_size=batch_size)
+    train_iter = DataLoader(dataset=trainset,
+                            batch_size=batch_size,
+                            shuffle=True)
+    valid_iter = DataLoader(dataset=validset,
+                            batch_size=batch_size,
+                            shuffle=False)
 
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.PAD_IDX)
     optimizer = optim.Adam(model.parameters(), lr=lr)
