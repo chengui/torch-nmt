@@ -1,8 +1,10 @@
 from torch import nn
 from nmt.model.seq2seq_gru import Seq2SeqGRU
+from nmt.model.seq2seq_bahdanau import Seq2SeqBahdanau
 
 MODELS = {
     'gru': Seq2SeqGRU,
+    'bahdanau': Seq2SeqBahdanau,
 }
 
 def init_weights(m):
