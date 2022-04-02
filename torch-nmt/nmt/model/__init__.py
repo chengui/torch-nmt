@@ -1,18 +1,17 @@
 from torch import nn
-from nmt.model.seq2seq_rnn import EncoderRNN, DecoderRNN, Seq2SeqRNN
+from nmt.model.seq2seq_gru import Seq2SeqGRU
 
 MODELS = {
-    'rnn': (EncoderRNN, DecoderRNN, Seq2SeqRNN),
+    'gru': Seq2SeqGRU,
 }
 
 def init_weights(m):
     for name, param in m.named_parameters():
         nn.init.uniform_(param.data, -0.08, 0.08)
 
-def create_model(model, vocab_size, embed_size=32, num_hiddens=32, num_layers=2, dropout=0.1):
-    (Encoder, Decoder, Seq2Seq) = MODELS[model]
-    encoder = Encoder(vocab_size[0], embed_size, num_hiddens, num_layers, dropout)
-    decoder = Decoder(vocab_size[1], embed_size, num_hiddens, num_layers, dropout)
-    seq2seq = Seq2Seq(encoder, decoder)
+def create_model(model, vocab_size):
+    Seq2Seq = MODELS[model]
+    (enc_vocab, dec_vocab) = vocab_size
+    seq2seq = Seq2Seq(enc_vocab, dec_vocab)
     seq2seq.apply(init_weights)
     return seq2seq

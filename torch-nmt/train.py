@@ -83,7 +83,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--dataset', default='tatoeba',
                         help='dataset to use')
-    parser.add_argument('-m', '--model', default='rnn',
+    parser.add_argument('-m', '--model', default='gru',
                         help='model to use')
     parser.add_argument('-b', '--batch-size', type=int, default=64,
                         help='batch size of dataloader')
