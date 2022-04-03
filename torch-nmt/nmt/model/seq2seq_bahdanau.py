@@ -65,7 +65,7 @@ class DecoderBahdanau(nn.Module):
                           dropout=dropout,
                           batch_first=True)
         self.attn = BahdanauAttention(n_hiddens, n_dir)
-        self.dense = nn.Linear(n_hiddens, n_vocab)
+        self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, state):
@@ -73,15 +73,18 @@ class DecoderBahdanau(nn.Module):
         enc_outs, hidden = state
         # enc_outs: (batch, seqlen, hiddens*dir)
         # hidden: (layers, batch, hiddens)
-        x = self.dropout(self.emb(x))
-        # x: (batch, seqlen, embed)
+        e = self.dropout(self.emb(x))
+        # e: (batch, seqlen, embed)
         c = self.attn(hidden[-1], enc_outs, enc_outs)
         # c: (batch, seqlen, hiddens*dir)
-        x = torch.cat([x, c], dim=-1)
-        # x: (batch, seqlen, embed+hiddens*dir)
-        out, hidden = self.rnn(x, hidden)
+        a = torch.cat([e, c], dim=-1)
+        # a: (batch, seqlen, embed+hiddens*dir)
+        out, hidden = self.rnn(a, hidden)
         # out: (batch, seqlen, hiddens)
         # hidden: (layers, batch, hiddens)
+        h = hidden[-1].unsqueeze(1).repeat(1, e.shape[1], 1)
+        # h: (batch, seqlen, hiddens)
+        out = torch.cat([e, h, out], dim=-1)
         out = self.dense(out)
         # out: (batch, seqlen, vocab)
         return out, (enc_outs, hidden)
