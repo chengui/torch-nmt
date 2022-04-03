@@ -5,30 +5,30 @@ from torch.nn import functional as F
 
 
 class BahdanauAttention(nn.Module):
-    def __init__(self, hid_dim):
+    def __init__(self, n_hiddens):
         super().__init__()
-        self.w = nn.Linear(hid_dim*2, hid_dim)
-        self.v = nn.Linear(hid_dim, 1, bias=False)
+        self.w = nn.Linear(n_hiddens*2, n_hiddens)
+        self.v = nn.Linear(n_hiddens, 1, bias=False)
 
     def forward(self, q, k, v):
-        # q: (batch, hid_dim)
-        # k: (batch, seqlen, hid_dim)
-        # v: (batch, seqlen, hid_dim)
+        # q: (batch, hiddens)
+        # k: (batch, seqlen, hiddens)
+        # v: (batch, seqlen, hiddens)
         q = q.unsqueeze(1).repeat(1, k.shape[1], 1)
-        # q: (batch, seqlen, hid_dim)
+        # q: (batch, seqlen, hiddens)
         a = self.w(torch.cat([q, k], dim=-1))
-        # a: (batch, seqlen, hid_dim)
+        # a: (batch, seqlen, hiddens)
         w = self.v(torch.tanh(a)).permute(0, 2, 1)
         # w: (batch, 1, seqlen)
         out = torch.bmm(F.softmax(w, dim=-1), v)
-        # out: (batch, 1, hid_dim)
+        # out: (batch, 1, hiddens)
         return out
 
 class EncoderBahdanau(nn.Module):
-    def __init__(self, in_dim, emb_dim, hid_dim, n_layers, dropout=0.1):
+    def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1):
         super().__init__()
-        self.emb = nn.Embedding(in_dim, emb_dim)
-        self.rnn = nn.GRU(emb_dim, hid_dim,
+        self.emb = nn.Embedding(n_vocab, n_embed)
+        self.rnn = nn.GRU(n_embed, n_hiddens,
                           num_layers=n_layers,
                           dropout=dropout,
                           batch_first=True)
@@ -37,53 +37,53 @@ class EncoderBahdanau(nn.Module):
     def forward(self, x):
         # x: (batch, seqlen)
         x = self.dropout(self.emb(x))
-        # x: (batch, seqlen, emb_dim)
+        # x: (batch, seqlen, embed)
         outs, hidden = self.rnn(x)
-        # outs: (batch, seqlen, hid_dim)
-        # hidden: (layers, batch, hid_dim)
+        # outs: (batch, seqlen, hiddens)
+        # hidden: (layers, batch, hiddens)
         return (outs, hidden)
 
 class DecoderBahdanau(nn.Module):
-    def __init__(self, out_dim, emb_dim, hid_dim, n_layers, dropout=0.1):
+    def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1):
         super().__init__()
-        self.emb = nn.Embedding(out_dim, emb_dim)
-        self.rnn = nn.GRU(emb_dim+hid_dim, hid_dim,
+        self.emb = nn.Embedding(n_vocab, n_embed)
+        self.rnn = nn.GRU(n_embed+n_hiddens, n_hiddens,
                           num_layers=n_layers,
                           dropout=dropout,
                           batch_first=True)
-        self.attn = BahdanauAttention(hid_dim)
-        self.dense = nn.Linear(hid_dim, out_dim)
+        self.attn = BahdanauAttention(n_hiddens)
+        self.dense = nn.Linear(n_hiddens, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, state):
         # x: (batch, seqlen)
         enc_outs, hidden = state
-        # enc_outs: (batch, seqlen, hid_dim)
-        # hidden: (layers, batch, hid_dim)
+        # enc_outs: (batch, seqlen, hiddens)
+        # hidden: (layers, batch, hiddens)
         x = self.dropout(self.emb(x))
-        # x: (batch, seqlen, emb_dim)
+        # x: (batch, seqlen, embed)
         c = self.attn(hidden[-1], enc_outs, enc_outs)
-        # c: (batch, seqlen, hid_dim)
+        # c: (batch, seqlen, hiddens)
         x = torch.cat([x, c], dim=-1)
-        # x: (batch, seqlen, emb_dim+hid_dim)
+        # x: (batch, seqlen, embed+hiddens)
         out, hidden = self.rnn(x, hidden)
-        # out: (batch, seqlen, hid_dim)
-        # hidden: (layers, batch, hid_dim)
+        # out: (batch, seqlen, hiddens)
+        # hidden: (layers, batch, hiddens)
         out = self.dense(out)
-        # out: (batch, seqlen, out_dim)
+        # out: (batch, seqlen, vocab)
         return out, (enc_outs, hidden)
 
 class Seq2SeqBahdanau(nn.Module):
-    def __init__(self, src_dim, tgt_dim, **kw):
+    def __init__(self, enc_vocab, dec_vocab, **kw):
         super().__init__()
-        self.encoder = EncoderBahdanau(in_dim=src_dim,
-                                       emb_dim=kw.get('enc_emb_dim', 256),
-                                       hid_dim=kw.get('enc_hid_dim', 512),
+        self.encoder = EncoderBahdanau(n_vocab=enc_vocab,
+                                       n_embed=kw.get('enc_embed', 256),
+                                       n_hiddens=kw.get('enc_hiddens', 512),
                                        n_layers=kw.get('n_layers', 1),
                                        dropout=kw.get('dropout', 0.0))
-        self.decoder = DecoderBahdanau(out_dim=tgt_dim,
-                                       emb_dim=kw.get('enc_emb_dim', 256),
-                                       hid_dim=kw.get('enc_hid_dim', 512),
+        self.decoder = DecoderBahdanau(n_vocab=dec_vocab,
+                                       n_embed=kw.get('dec_embed', 256),
+                                       n_hiddens=kw.get('dec_hiddens', 512),
                                        n_layers=kw.get('n_layers', 1),
                                        dropout=kw.get('dropout', 0.0))
 
@@ -100,7 +100,7 @@ class Seq2SeqBahdanau(nn.Module):
                 x = pred
             # x: (batch,)
             out, state = self.decoder(x.unsqueeze(-1), state)
-            # out: (batch, 1, out_dim)
+            # out: (batch, 1, vocab)
             pred = out.argmax(2).squeeze(1)
             # pred: (batch,)
             outs.append(out)
