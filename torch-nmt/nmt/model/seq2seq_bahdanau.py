@@ -10,7 +10,7 @@ class BahdanauAttention(nn.Module):
         self.w = nn.Linear(n_hiddens*(n_dir+1), n_hiddens)
         self.v = nn.Linear(n_hiddens, 1, bias=False)
 
-    def forward(self, q, k, v):
+    def forward(self, q, k, v, mask):
         # q: (batch, hiddens)
         # k: (batch, seqlen, hiddens*dir)
         # v: (batch, seqlen, hiddens*dir)
@@ -20,7 +20,9 @@ class BahdanauAttention(nn.Module):
         # a: (batch, seqlen, hiddens)
         w = self.v(torch.tanh(a)).permute(0, 2, 1)
         # w: (batch, 1, seqlen)
-        out = torch.bmm(F.softmax(w, dim=-1), v)
+        w = F.softmax(w.masked_fill(mask==0, -1e10), dim=-1)
+        # w: (batch, 1, seqlen)
+        out = torch.bmm(w, v)
         # out: (batch, 1, hiddens)
         return out
 
@@ -68,14 +70,14 @@ class DecoderBahdanau(nn.Module):
         self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, state):
+    def forward(self, x, state, mask):
         # x: (batch, seqlen)
         enc_outs, hidden = state
         # enc_outs: (batch, seqlen, hiddens*dir)
         # hidden: (layers, batch, hiddens)
         e = self.dropout(self.emb(x))
         # e: (batch, seqlen, embed)
-        c = self.attn(hidden[-1], enc_outs, enc_outs)
+        c = self.attn(hidden[-1], enc_outs, enc_outs, mask)
         # c: (batch, seqlen, hiddens*dir)
         a = torch.cat([e, c], dim=-1)
         # a: (batch, seqlen, embed+hiddens*dir)
@@ -104,20 +106,27 @@ class Seq2SeqBahdanau(nn.Module):
                                        enc_birnn=kw.get('enc_birnn', False),
                                        n_layers=kw.get('n_layers', 1),
                                        dropout=kw.get('dropout', 0.0))
+        self.enc_pad = kw.get('enc_pad', 1)
+
+    def make_enc_mask(self, enc_x):
+        # enc_x: (batch, seqlen)
+        enc_mask = (enc_x != self.enc_pad).unsqueeze(1)
+        # enc_mask: (batch, 1, seqlen)
+        return enc_mask
 
     def forward(self, enc_x, dec_x, teacher_ratio=0.5):
         # enc_x: (batch, seqlen)
         # dec_x: (batch, seqlen)
-        seqlen = dec_x.shape[1]
+        mask = self.make_enc_mask(enc_x)
         state = self.encoder(enc_x)
         pred, outs = None, []
-        for t in range(seqlen):
+        for t in range(dec_x.shape[1]):
             if pred is None or (random.random() < teacher_ratio):
                 x = dec_x[:, t]
             else:
                 x = pred
             # x: (batch,)
-            out, state = self.decoder(x.unsqueeze(-1), state)
+            out, state = self.decoder(x.unsqueeze(-1), state, mask)
             # out: (batch, 1, vocab)
             pred = out.argmax(2).squeeze(1)
             # pred: (batch,)
