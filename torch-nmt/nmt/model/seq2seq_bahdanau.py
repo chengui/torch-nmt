@@ -5,17 +5,15 @@ from torch.nn import functional as F
 
 
 class BahdanauAttention(nn.Module):
-    def __init__(self, n_hiddens, n_dir=1):
+    def __init__(self, n_hiddens):
         super().__init__()
-        self.w = nn.Linear(n_hiddens*(n_dir+1), n_hiddens)
+        self.w = nn.Linear(n_hiddens*2, n_hiddens)
         self.v = nn.Linear(n_hiddens, 1, bias=False)
 
     def forward(self, q, k, v, mask):
-        # q: (batch, hiddens)
-        # k: (batch, seqlen, hiddens*dir)
-        # v: (batch, seqlen, hiddens*dir)
-        q = q.unsqueeze(1).repeat(1, k.shape[1], 1)
         # q: (batch, seqlen, hiddens)
+        # k: (batch, seqlen, hiddens)
+        # v: (batch, seqlen, hiddens)
         a = self.w(torch.cat([q, k], dim=-1))
         # a: (batch, seqlen, hiddens)
         w = self.v(torch.tanh(a)).permute(0, 2, 1)
@@ -28,45 +26,45 @@ class BahdanauAttention(nn.Module):
 
 class EncoderBahdanau(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
-                 enc_birnn=False):
+                 use_birnn=False):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, n_embed)
         self.rnn = nn.GRU(n_embed, n_hiddens,
                           num_layers=n_layers,
-                          bidirectional=enc_birnn,
+                          bidirectional=use_birnn,
                           dropout=dropout,
                           batch_first=True)
         self.dropout = nn.Dropout(dropout)
-        self.birnn = enc_birnn
-        if self.birnn :
+        self.use_birnn = use_birnn
+        if self.use_birnn :
             self.dense = nn.Linear(n_layers*2, n_layers)
 
-    def forward(self, x):
-        # x: (batch, seqlen)
-        x = self.dropout(self.emb(x))
-        # x: (batch, seqlen, embed)
-        outs, hidden = self.rnn(x)
-        # outs: (batch, seqlen, hiddens*dir)
-        # hidden: (layers*dir, batch, hiddens)
-        if self.birnn:
-            # hidden: (layers*2, batch, hiddens)
-            hidden = self.dense(hidden.permute(1, 2, 0))
-            # hidden: (batch, hiddens, layers)
-            hidden = torch.tanh(hidden.permute(2, 0, 1))
-            # hidden: (layers, batch, hiddens)
-        return (outs, hidden)
+    def forward(self, x, l):
+        # x: (batch, seqlen), l: (batch,)
+        e = self.dropout(self.emb(x))
+        # e: (batch, seqlen, embed)
+        o, h = self.rnn(e)
+        # o: (batch, seqlen, hiddens*dir)
+        # h: (layers*dir, batch, hiddens)
+        if self.use_birnn:
+            # h: (layers*2, batch, hiddens)
+            h = self.dense(h.permute(1, 2, 0))
+            # h: (batch, hiddens, layers)
+            h = torch.tanh(h.permute(2, 0, 1))
+            # h: (layers, batch, hiddens)
+        return (o, h)
 
 class DecoderBahdanau(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
-                 enc_birnn=False):
+                 use_birnn=False):
         super().__init__()
-        n_dir = 2 if enc_birnn else 1
+        self.n_dir = 2 if use_birnn else 1
         self.emb = nn.Embedding(n_vocab, n_embed)
-        self.rnn = nn.GRU(n_embed+n_hiddens*n_dir, n_hiddens,
+        self.rnn = nn.GRU(n_embed+n_hiddens*self.n_dir, n_hiddens,
                           num_layers=n_layers,
                           dropout=dropout,
                           batch_first=True)
-        self.attn = BahdanauAttention(n_hiddens, n_dir)
+        self.attn = BahdanauAttention(n_hiddens*self.n_dir)
         self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
@@ -77,17 +75,18 @@ class DecoderBahdanau(nn.Module):
         # hidden: (layers, batch, hiddens)
         e = self.dropout(self.emb(x))
         # e: (batch, seqlen, embed)
-        c = self.attn(hidden[-1], enc_outs, enc_outs, mask)
+        h = hidden[-1].unsqueeze(1).repeat(1, enc_outs.shape[1], self.n_dir)
+        c = self.attn(h, enc_outs, enc_outs, mask)
         # c: (batch, seqlen, hiddens*dir)
         a = torch.cat([e, c], dim=-1)
         # a: (batch, seqlen, embed+hiddens*dir)
-        out, hidden = self.rnn(a, hidden)
-        # out: (batch, seqlen, hiddens)
+        o, hidden = self.rnn(a, hidden)
+        # o: (batch, seqlen, hiddens)
         # hidden: (layers, batch, hiddens)
         h = hidden[-1].unsqueeze(1).repeat(1, e.shape[1], 1)
         # h: (batch, seqlen, hiddens)
-        out = torch.cat([e, h, out], dim=-1)
-        out = self.dense(out)
+        o = torch.cat([e, h, o], dim=-1)
+        out = self.dense(o)
         # out: (batch, seqlen, vocab)
         return out, (enc_outs, hidden)
 
@@ -96,29 +95,29 @@ class Seq2SeqBahdanau(nn.Module):
         super().__init__()
         self.encoder = EncoderBahdanau(n_vocab=enc_vocab,
                                        n_embed=kw.get('enc_embed', 256),
-                                       n_hiddens=kw.get('enc_hiddens', 512),
+                                       n_hiddens=kw.get('n_hiddens', 512),
                                        n_layers=kw.get('n_layers', 1),
-                                       enc_birnn=kw.get('enc_birnn', False),
+                                       use_birnn=kw.get('use_birnn', False),
                                        dropout=kw.get('dropout', 0.0))
         self.decoder = DecoderBahdanau(n_vocab=dec_vocab,
                                        n_embed=kw.get('dec_embed', 256),
-                                       n_hiddens=kw.get('dec_hiddens', 512),
-                                       enc_birnn=kw.get('enc_birnn', False),
+                                       n_hiddens=kw.get('n_hiddens', 512),
+                                       use_birnn=kw.get('use_birnn', False),
                                        n_layers=kw.get('n_layers', 1),
                                        dropout=kw.get('dropout', 0.0))
-        self.enc_pad = kw.get('enc_pad', 1)
 
-    def make_enc_mask(self, enc_x):
-        # enc_x: (batch, seqlen)
-        enc_mask = (enc_x != self.enc_pad).unsqueeze(1)
+    def make_enc_mask(self, enc_len, maxlen):
+        # enc_len: (batch,)
+        m = torch.arange(maxlen).unsqueeze(0).repeat(enc_len.shape[0], 1)
+        enc_mask = m.lt(enc_len.unsqueeze(1)).unsqueeze(1)
         # enc_mask: (batch, 1, seqlen)
         return enc_mask
 
-    def forward(self, enc_x, dec_x, teacher_ratio=0.5):
-        # enc_x: (batch, seqlen)
-        # dec_x: (batch, seqlen)
-        mask = self.make_enc_mask(enc_x)
-        state = self.encoder(enc_x)
+    def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
+        # enc_x: (batch, seqlen), enc_len: (batch,)
+        # dec_x: (batch, seqlen), dec_len: (batch,)
+        mask = self.make_enc_mask(enc_len, enc_x.shape[1])
+        state = self.encoder(enc_x, enc_len)
         pred, outs = None, []
         for t in range(dec_x.shape[1]):
             if pred is None or (random.random() < teacher_ratio):
@@ -134,8 +133,8 @@ class Seq2SeqBahdanau(nn.Module):
         return torch.cat(outs, dim=1)
 
 if __name__ == '__main__':
-    seq2seq = Seq2SeqBahdanau(101, 102, n_layers=2, enc_birnn=True)
-    enc_x = torch.randint(101, (32, 10))
-    dec_x = torch.randint(102, (32, 11))
-    outs = seq2seq(enc_x, dec_x)
+    seq2seq = Seq2SeqBahdanau(101, 102, n_layers=2, use_birnn=True)
+    enc_x, enc_len = torch.randint(101, (8, 10)), torch.randint(1, 10, (8,))
+    dec_x, dec_len = torch.randint(102, (8, 11)), torch.randint(1, 10, (8,))
+    outs = seq2seq(enc_x, enc_len, dec_x, dec_len)
     print(outs.shape)
