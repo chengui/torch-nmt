@@ -56,7 +56,7 @@ class EncoderLuong(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.birnn = use_birnn
 
-    def forward(self, x):
+    def forward(self, x, l):
         # x: (batch, seqlen)
         x = self.dropout(self.emb(x))
         # x: (batch, seqlen, embed)
@@ -119,17 +119,18 @@ class Seq2SeqLuong(nn.Module):
                                        dropout=kw.get('dropout', 0.0))
         self.enc_pad = kw.get('enc_pad', 1)
 
-    def make_enc_mask(self, enc_x):
-        # enc_x: (batch, seqlen)
-        enc_mask = (enc_x != self.enc_pad).unsqueeze(1)
+    def make_enc_mask(self, enc_len, maxlen):
+        # enc_len: (batch,)
+        m = torch.arange(maxlen).unsqueeze(0).repeat(enc_len.shape[0], 1)
+        enc_mask = m.lt(enc_len.unsqueeze(1)).unsqueeze(1)
         # enc_mask: (batch, 1, seqlen)
         return enc_mask
 
-    def forward(self, enc_x, dec_x, teacher_ratio=0.5):
+    def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
         # enc_x: (batch, seqlen)
         # dec_x: (batch, seqlen)
-        mask = self.make_enc_mask(enc_x)
-        state = self.encoder(enc_x)
+        mask = self.make_enc_mask(enc_len, enc_x.shape[1])
+        state = self.encoder(enc_x, enc_len)
         pred, outs = None, []
         for t in range(dec_x.shape[1]):
             if pred is None or (random.random() < teacher_ratio):
@@ -146,7 +147,7 @@ class Seq2SeqLuong(nn.Module):
 
 if __name__ == '__main__':
     seq2seq = Seq2SeqLuong(101, 102, n_layers=2, use_birnn=True)
-    enc_x = torch.randint(101, (32, 10))
-    dec_x = torch.randint(102, (32, 11))
-    outs = seq2seq(enc_x, dec_x)
+    enc_x, enc_len = torch.randint(101, (32, 10)), torch.randint(1, 10, (32,))
+    dec_x, dec_len = torch.randint(102, (32, 11)), torch.randint(1, 10, (32,))
+    outs = seq2seq(enc_x, enc_len, dec_x, dec_len)
     print(outs.shape)
