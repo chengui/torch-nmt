@@ -1,17 +1,13 @@
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from nmt.processor.base import BaseProcessor
-from nmt.model import create_model
-from nmt.dataset import (
-    create_dataset,
-    split_dataset
-)
-from nmt.util.grad import clip_grad
-from nmt.util.fs_util import (
-    load_checkpoint,
-    save_checkpoint,
-    save_vocab
+from nmt.dataset import create_dataset
+from nmt.vocab import load_vocab
+from nmt.util import clip_grad
+from nmt.model import (
+    create_model,
+    load_ckpt,
+    save_ckpt,
 )
 
 
@@ -19,12 +15,14 @@ def valid_epoch(model, data_iter, criterion):
     model.eval()
     with torch.no_grad():
         valid_loss = 0
-        for idx, (src, tgt) in enumerate(data_iter):
-            pred = model(src, tgt)
-            # pred: (batch_size, seq, vocab_size)
-            # tgt: (batch_size, seq)
+        for idx, batch in enumerate(data_iter):
+            src, src_len, tgt, tgt_len = batch
+            tgt, gold = tgt[:, :-1], tgt[:, 1:]
+            pred = model(src, src_len, tgt, tgt_len)
+            # pred: (batch, seqlen, vocab)
+            # gold: (batch, seq)
             pred = pred.permute(0, 2, 1)
-            loss = criterion(pred[:, :, 1:], tgt[:, 1:])
+            loss = criterion(pred, gold)
             valid_loss += loss
         valid_loss /= len(data_iter)
         return valid_loss
@@ -32,13 +30,15 @@ def valid_epoch(model, data_iter, criterion):
 def train_epoch(model, data_iter, criterion, optimizer):
     model.train()
     train_loss = 0
-    for idx, (src, tgt) in enumerate(data_iter):
+    for idx, batch in enumerate(data_iter):
+        src, src_len, tgt, tgt_len = batch
+        tgt, gold = tgt[:, :-1], tgt[:, 1:]
         optimizer.zero_grad()
-        pred = model(src, tgt)
-        # pred: (batch_size, seq, vocab_size)
-        # tgt: (batch_size, seq)
+        pred = model(src, src_len, tgt, tgt_len)
+        # pred: (batch, seqlen, vocab)
+        # gold: (batch, seqlen)
         pred = pred.permute(0, 2, 1)
-        loss = criterion(pred[:, :, 1:], tgt[:, 1:])
+        loss = criterion(pred, gold)
         loss.backward()
         # clip grad
         clip_grad(model, 1)
@@ -47,21 +47,17 @@ def train_epoch(model, data_iter, criterion, optimizer):
     train_loss /= len(data_iter)
     return train_loss
 
-def train(model, dataset, num_epochs, batch_size, lr, pretrain, outdir):
-    src_vocab, tgt_vocab =  dataset.src_vocab, dataset.tgt_vocab
-    trainset, validset = split_dataset(dataset, ratios=[0.8, 0.2])
-
-    train_iter = DataLoader(dataset=trainset,
+def train(model, train_set, valid_set, src_vocab, tgt_vocab, work_dir=None,
+          num_epochs=10, batch_size=32, learning_rate=0.001):
+    train_iter = DataLoader(dataset=train_set,
                             batch_size=batch_size,
                             shuffle=True)
-    valid_iter = DataLoader(dataset=validset,
+    valid_iter = DataLoader(dataset=valid_set,
                             batch_size=batch_size,
                             shuffle=False)
 
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.PAD_IDX)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    if pretrain:
-        load_checkpoint(pretrain, model, optimizer)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     train_hist, valid_hist = [], []
     for epoch in range(num_epochs):
@@ -70,39 +66,49 @@ def train(model, dataset, num_epochs, batch_size, lr, pretrain, outdir):
 
         train_hist.append(train_loss)
         valid_hist.append(valid_loss)
-        print(f'epoch {epoch + 1}: train_loss={train_loss:>3f}, '
+
+        if work_dir is not None:
+            save_ckpt(work_dir, model, mode='last')
+        if valid_loss <= min(valid_hist):
+            save_ckpt(work_dir, model, mode='best')
+
+        print(f'epoch {epoch+1}: train_loss={train_loss:>3f}, '
               f'valid_loss={valid_loss:>3f}')
 
-        if (epoch + 1) % 10 == 0:
-            save_checkpoint(f'{outdir}/model.pt', model, optimizer)
-            save_vocab(src_vocab, tgt_vocab, outdir)
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dataset', default='tatoeba',
-                        help='dataset to use')
-    parser.add_argument('-m', '--model', default='gru',
-                        help='model to use')
-    parser.add_argument('-b', '--batch-size', type=int, default=64,
-                        help='batch size of dataloader')
-    parser.add_argument('-l', '--lr', type=float, default=0.01,
-                        help='learning rate')
-    parser.add_argument('-n', '--epochs', type=int, default=10,
-                        help='number of train epochs')
-    parser.add_argument('-r', '--root-dir', default='.',
-                         help='root dir of dataset')
-    parser.add_argument('-t', '--pretrain', default='nmt.pt',
-                         help='pretrain model')
-    parser.add_argument('-o', '--outdir', default='./output',
-                        help='output dir')
+    parser.add_argument('-m', '--model-type', required=True,
+                        help='model type to use')
+    parser.add_argument('-d', '--data-dir', required=True,
+                        help='prepared dir with preprocessed data')
+    parser.add_argument('-w', '--work-dir', type=str, default='./out',
+                        help='working dir to output')
+    parser.add_argument('-n', '--num-epochs', type=int, default=10,
+                        help='number of training epochs')
+    parser.add_argument('-b', '--batch-size', type=int, default=32,
+                        help='batch size of mini-batch')
+    parser.add_argument('-l', '--learning-rate', type=float, default=0.001,
+                        help='learning rate of training')
+    parser.add_argument('--checkpoint', action='store_true',
+                        help='whether use checkpoint in working dir')
     args = parser.parse_args()
 
-    dataset = create_dataset(dataset=args.dataset,
-                             root_dir=args.root_dir,
-                             processor=BaseProcessor())
-    vocab_size = (len(dataset.src_vocab), len(dataset.tgt_vocab))
-    model = create_model(model=args.model, vocab_size=vocab_size)
+    src_vocab, tgt_vocab = load_vocab(args.data_dir)
+    train_set, valid_set = create_dataset(args.data_dir,
+                                          vocab=(src_vocab, tgt_vocab),
+                                          split=('train', 'valid'))
+    model = create_model(model_type=args.model_type,
+                         enc_vocab=len(src_vocab),
+                         dec_vocab=len(tgt_vocab))
 
-    train(model, dataset, args.epochs, args.batch_size, args.lr, args.pretrain, args.outdir)
+    if args.checkpoint:
+        load_ckpt(model, args.work_dir)
+
+    train(model, train_set, valid_set, src_vocab, tgt_vocab,
+          work_dir=args.work_dir,
+          num_epochs=args.num_epochs,
+          batch_size=args.batch_size,
+          learning_rate=args.learning_rate)
