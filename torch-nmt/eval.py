@@ -62,13 +62,15 @@ if __name__ == '__main__':
                         help='model type to use')
     parser.add_argument('-d', '--data-dir', required=True,
                         help='preprocessed dir with preprocessed data')
+    parser.add_argument('-v', '--vocab-dir', required=True,
+                        help='vocab dir with source and target vocab')
     parser.add_argument('-w', '--work-dir', type=str, default='./out',
                         help='working dir to output')
     parser.add_argument('-b', '--batch-size', type=int, default=32,
                         help='batch size of dataloader')
     args = parser.parse_args()
 
-    src_vocab, tgt_vocab = load_vocab(args.data_dir)
+    src_vocab, tgt_vocab = load_vocab(args.vocab_dir)
     test_set = create_dataset(args.data_dir,
                               vocab=(src_vocab, tgt_vocab),
                               split=('test'))
