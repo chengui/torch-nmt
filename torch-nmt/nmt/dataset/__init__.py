@@ -1,15 +1,15 @@
-from torch.utils.data import random_split
-from nmt.dataset.tatoeba import TatoebaDataset
+import os
+from nmt.dataset.tabular import TabularDataset
 
 DATASETS = {
-    'tatoeba': TatoebaDataset,
+    'tabular': TabularDataset,
 }
 
-def split_dataset(dataset, ratios=[0.8, 0.2]):
-    lengths = [int(len(dataset) * i) for i in ratios]
-    lengths[-1] = len(dataset) - sum(lengths[:-1])
-    return random_split(dataset, lengths=lengths)
-
-def create_dataset(dataset, split='train', **kwargs):
-    Dataset = DATASETS[dataset]
-    return Dataset(split=split, **kwargs)
+def create_dataset(data_dir, vocab, split=('train',), ftype='tabular'):
+    if isinstance(vocab, (list, tuple)):
+        src_vocab, tgt_vocab = vocab
+    else:
+        src_vocab, tgt_vocab = vocab, vocab
+    Dataset = DATASETS[ftype]
+    paths = [os.path.join(data_dir, f'{sp}.txt') for sp in split]
+    return [Dataset(path, src_vocab, tgt_vocab) for path in paths]
