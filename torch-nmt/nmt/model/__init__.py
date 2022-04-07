@@ -1,10 +1,12 @@
 import os
 import torch
 from nmt.model.seq2seq_gru import Seq2SeqGRU
+from nmt.model.seq2seq_luong import Seq2SeqLuong
 from nmt.model.seq2seq_bahdanau import Seq2SeqBahdanau
 
 MODELS = {
-    'gru': Seq2SeqGRU,
+    'gru':      Seq2SeqGRU,
+    'luong':    Seq2SeqLuong,
     'bahdanau': Seq2SeqBahdanau,
 }
 
