@@ -11,11 +11,15 @@ MODELS = {
 }
 
 def init_weights(m):
-    for name, param in m.named_parameters():
-        torch.nn.init.xavier_uniform_(param.data)
+    if type(m) == torch.nn.Linear:
+        torch.nn.init.xavier_uniform_(m.weight)
+    else:
+        for name, param in m.named_parameters():
+            if 'weight' in name:
+                torch.nn.init.xavier_uniform_(param.data)
 
-def create_model(model, enc_vocab, dec_vocab, **kw):
-    seq2seq = MODELS[model](enc_vocab, dec_vocab)
+def create_model(model_type, enc_vocab, dec_vocab, **kw):
+    seq2seq = MODELS[model_type](enc_vocab, dec_vocab)
     seq2seq.apply(init_weights)
     return seq2seq
 
