@@ -7,8 +7,7 @@ class Vocab(object):
     SOS_IDX, SOS_TOK = 2, '<sos>'
     EOS_IDX, EOS_TOK = 3, '<eos>'
 
-    def __init__(self, name=None, reserved_tokens=[]):
-        self.name = name
+    def __init__(self, reserved_tokens=[]):
         self.itos = [
             Vocab.UNK_TOK,
             Vocab.PAD_TOK,
@@ -44,14 +43,10 @@ class Vocab(object):
             self.stoi.update({v: k for k, v in enumerate(self.itos)})
         return self
 
-    def token(self, indices, filter_reserved=False):
+    def token(self, indices):
         if not isinstance(indices, (list, tuple)):
             return self.itos[indices]
-        if filter_reserved:
-            rsd = set([Vocab.PAD_IDX, Vocab.SOS_IDX, Vocab.EOS_IDX])
-            return [self.itos[i] for i in indices if i not in rsd]
-        else:
-            return [self.itos[i] for i in indices]
+        return [self.itos[i] for i in indices]
 
     def index(self, tokens):
         if not isinstance(tokens, (list, tuple)):
