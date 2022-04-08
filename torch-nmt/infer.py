@@ -62,7 +62,7 @@ if __name__ == '__main__':
     model = create_model(model_type=args.model_type,
                          enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab))
-    load_ckpt(model, args.work_dir)
+    load_ckpt(model, args.work_dir, mode='best')
 
     with open(args.source_file, 'r') as f:
         sents = [l.strip().split(' ') for l in f]
