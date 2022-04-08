@@ -1,61 +1,71 @@
+import os
 import torch
-from nmt.processor.base import BaseProcessor
-from nmt.model import create_model
-from nmt.util.fs_util import load_checkpoint, load_vocab
+from nmt.vocab import load_vocab
+from nmt.model import (
+    create_model,
+    load_ckpt,
+)
 
 
-def predict_one(encoder, decoder, enc_seq, dec_seq, maxlen, eos_idx):
-    if not isinstance(enc_seq, torch.Tensor):
-        enc_seq = torch.tensor(enc_seq)
-    if not isinstance(dec_seq, torch.Tensor):
-        dec_seq = torch.tensor(dec_seq)
-    enc_X = enc_seq.unsqueeze(0)
-    dec_X = dec_seq.unsqueeze(0)
-    _, state = encoder(enc_X)
-    outputs = []
-    X = dec_X[:, 0]
-    for _ in range(maxlen):
-        output, state = decoder(X, state)
-        X = output.argmax(1)
-        pred = X.squeeze(0).item()
-        if pred == eos_idx:
-            break
-        outputs.append(pred)
-    return outputs
+def batch_toindex(tokens, vocab):
+    if not isinstance(tokens, (tuple, list)):
+        tokens = [tokens]
+    tokens = [vocab[token] for token in tokens]
+    return tokens
 
-def predict(model, processor, src_vocab, tgt_vocab, src_texts, maxlen=10):
-    model.eval()
-    if isinstance(processor, (list, tuple)):
-        src_processor, _ = processor
-    else:
-        src_processor, _ = processor, processor
-    src_data, _ = src_processor(src_texts, src_vocab)
-    encoder, decoder = model.encoder, model.decoder
-    eos_idx = tgt_vocab.EOS_IDX
-    for (sent, src) in zip(src_texts, src_data):
-        tgt = [tgt_vocab.EOS_IDX]
-        pred = predict_one(encoder, decoder, src, tgt, maxlen, eos_idx)
-        pred = ' '.join(tgt_vocab.token(pred))
-        print(f'> {sent}')
-        print(f'< {pred}')
+def batch_totoken(indics, vocab):
+    if isinstance(indics, torch.Tensor):
+        indics = indics.tolist()
+    filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
+    batch = []
+    for sent in indics:
+        sent = list(filter(filtered, sent))
+        if vocab.EOS_IDX in sent:
+            i = sent.index(vocab.EOS_IDX)
+            sent = sent[:i+1]
+        batch.append(vocab.token(sent))
+    return batch
+
+def predict(model, sents, src_vocab, tgt_vocab, pred_file=None, max_len=10):
+    with open(pred_file, 'w', encoding='utf-8') as wf:
+        model.eval()
+        src_indics = batch_toindex(sents, src_vocab)
+        for _, src_indic in enumerate(src_indics):
+            src_indic = [src_vocab.SOS_IDX] + src_indic + [src_vocab.EOS_IDX]
+            src = torch.tensor([src_indic])
+            src_len = torch.tensor([len(src_indic)])
+            sos = torch.full((src.shape[0], max_len), tgt_vocab.SOS_IDX)
+            sos_len = torch.ones((src.shape[0],))
+            pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
+            tokens = batch_totoken(pred.argmax(2), tgt_vocab)
+            wf.write(' '.join(tokens[0]) + '\n')
 
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', default='rnn',
-                        help='model to use')
-    parser.add_argument('-s', '--sents', action='append',
-                        help='sentences')
-    parser.add_argument('-t', '--trained', default='./output',
-                        help='trained model')
+    parser.add_argument('-m', '--model-type', required=True,
+                        help='model type to use')
+    parser.add_argument('-w', '--work-dir', required=True,
+                        help='working dir to output')
+    parser.add_argument('-f', '--source-file', required=True,
+                        help='source file with preprocessed data')
+    parser.add_argument('-l', '--max-len', type=int, default=10,
+                        help='maxium length to predict')
     args = parser.parse_args()
 
-    src_vocab, tgt_vocab = load_vocab(args.trained)
-    vocab_size = (len(src_vocab), len(tgt_vocab))
-    model = create_model(args.model, vocab_size=vocab_size)
-    load_checkpoint(f'{args.trained}/model.pt', model)
-    processor = BaseProcessor()
+    src_vocab, tgt_vocab = load_vocab(args.work_dir)
+    model = create_model(model_type=args.model_type,
+                         enc_vocab=len(src_vocab),
+                         dec_vocab=len(tgt_vocab))
+    load_ckpt(model, args.work_dir)
 
-    predict(model, processor, src_vocab, tgt_vocab, args.sents)
+    with open(args.source_file, 'r') as f:
+        sents = [l.strip() for l in f]
+    out_dir = os.path.join(args.work_dir, 'out')
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    pred_name = os.path.basename(args.source_file) + '.pred'
+    pred_file = os.path.join(out_dir, pred_name)
+    predict(model, sents, src_vocab, tgt_vocab, pred_file, args.max_len)
