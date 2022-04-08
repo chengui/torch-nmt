@@ -2,36 +2,57 @@ import math
 import collections
 
 
-def bleu_score(conds, refs, max_n=4, weights=[0.25]*4):
-    cond_len, ref_len = 0, 0
-    num_match, num_total = [0]*max_n, [0]*max_n
-    for (cond, ref) in zip(conds, refs):
-        cond_len += len(cond)
-        ref_len += len(ref)
+def ngram_counter(seq, n):
+    counts = collections.Counter()
+    for i in range(n):
+        for k in range(0, len(seq) - i):
+            ngram = tuple(seq[k:k+i+1])
+            counts[ngram] += 1
+    return counts
+
+def bleu_score(cands, refss, max_n=4, weights=[0.25]*4, smooth=False):
+    cand_len = 0
+    refs_len = 0
+    total_counts = [0] * max_n
+    clipped_counts = [0] * max_n
+    for (cand, refs) in zip(cands, refss):
+        cand_len += len(cand)
+        refs_len += min([len(ref) for ref in refs],
+                        key=lambda i: abs(len(cand) - i))
+
+        merged = collections.Counter()
+        for ref in refs:
+            merged |= ngram_counter(ref, max_n)
+        cand_counter = ngram_counter(cand, max_n)
+        clipped = cand_counter & merged
+
+        for ngram in clipped:
+            clipped_counts[len(ngram)-1] += clipped[ngram]
         for n in range(max_n):
-            if len(ref) <= n:
-                num_match[n] = -1
-                break
-            if len(cond) <= n:
-                num_total[n] = 1
-                continue
-            num_total[n] += len(cond) - n
-            ref_counter = collections.defaultdict(int)
-            for i in range(len(ref)-n):
-                ref_counter[' '.join(ref[i:i+n+1])] += 1
-            for i in range(len(cond)-n):
-                if ref_counter[' '.join(cond[i:i+n+1])] > 0:
-                    num_match[n] += 1
-                    ref_counter[' '.join(cond[i:i+n+1])] -= 1
-    score = math.exp(min(0, 1-ref_len/cond_len))
-    for i in range(max_n):
-        if num_match[i] < 0:
-            break
-        score *= math.pow(num_match[i]/num_total[i], weights[i])
-    return score
+            total_counts[n] += max(0, len(cand)-n)
+
+    print(clipped_counts, total_counts)
+
+    pn = [0] * max_n
+    for n in range(max_n):
+        if smooth:
+            pn[n] = (clipped_counts[n] + 1.) / (total_counts[n] + 1.)
+        elif total_counts[n] > 0:
+            pn[n] = float(clipped_counts[n]) / total_counts[n]
+        else:
+            pn[n] = 0.0
+
+    if min(pn) == 0:
+        return 0.0, tuple(pn)
+
+    log_pn = sum(w * math.log(p) for (w, p) in zip(weights, pn))
+    log_bp = min(0, 1 - cand_len/refs_len)
+
+    return math.exp(log_bp + log_pn), tuple(pn)
 
 
 if __name__ == '__main__':
-    refs = [['the', 'cat', 'is', 'on', 'the', 'mat'], ['he', 'says']]
+    refss = [[['the', 'cat', 'is', 'on', 'the', 'mat']], [['he', 'says']]]
     conds = [['the', 'cat', 'sat', 'on', 'the', 'mat'], ['he', 'says']]
-    print(bleu_score(conds, refs))
+    #print(ngram_counter(conds[0], 4))
+    print(bleu_score(conds, refss, smooth=True))
