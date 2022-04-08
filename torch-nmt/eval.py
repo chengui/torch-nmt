@@ -43,11 +43,12 @@ def evaluate_bleu(model, data_iter, vocab, max_len=10):
     cnd_seq, ref_seq = [], []
     for _, batch in enumerate(data_iter):
         src, src_len, tgt, tgt_len = batch
+        tgt, gold = tgt[:, :-1], tgt[:, 1:]
         sos = torch.full((src.shape[0], max_len), vocab.SOS_IDX)
         sos_len = torch.ones((src.shape[0],))
         pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
         cnd_seq.extend(batch_totoken(pred.argmax(2), vocab))
-        ref_seq.extend(batch_totoken(tgt[:, 1:], vocab))
+        ref_seq.extend(batch_totoken(gold, vocab))
     return bleu_score(cnd_seq, ref_seq)
 
 def evaluate(model, dataset, vocab, batch_size=32, max_len=10):
