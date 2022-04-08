@@ -82,12 +82,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model-type', required=True,
                         help='model type to use')
-    parser.add_argument('-d', '--data-dir', required=True,
-                        help='prepared dir with preprocessed data')
-    parser.add_argument('-v', '--vocab-dir', required=True,
-                        help='vocab dir with source and target vocab')
-    parser.add_argument('-w', '--work-dir', type=str, default='./out',
-                        help='working dir to output')
+    parser.add_argument('-w', '--work-dir', required=True,
+                        help='working dir to perform')
     parser.add_argument('-n', '--num-epochs', type=int, default=10,
                         help='number of training epochs')
     parser.add_argument('-b', '--batch-size', type=int, default=32,
@@ -98,8 +94,8 @@ if __name__ == '__main__':
                         help='whether use checkpoint in working dir')
     args = parser.parse_args()
 
-    src_vocab, tgt_vocab = load_vocab(args.vocab_dir)
-    train_set, valid_set = create_dataset(args.data_dir,
+    src_vocab, tgt_vocab = load_vocab(args.work_dir)
+    train_set, valid_set = create_dataset(args.work_dir,
                                           vocab=(src_vocab, tgt_vocab),
                                           split=('train', 'valid'))
     model = create_model(model_type=args.model_type,

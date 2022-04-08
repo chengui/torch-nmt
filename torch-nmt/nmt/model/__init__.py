@@ -24,13 +24,19 @@ def create_model(model_type, enc_vocab, dec_vocab, **kw):
     return seq2seq
 
 def load_ckpt(model, work_dir, mode='last'):
-    model_file = os.path.join(work_dir, f'checkpoint-{mode}.pt')
+    model_dir = os.path.join(work_dir, 'model')
+    if not os.path.exists(model_dir):
+        raise OSError(f'model dir not exits: {work_dir}')
+    model_file = os.path.join(model_dir, f'checkpoint-{mode}.pt')
     if not os.path.exists(model_file):
-        raise OSError(f'checkpoint not under {work_dir}')
+        raise OSError(f'checkpoint not exists: {work_dir}')
     checkpoint = torch.load(model_file)
     model.load_state_dict(checkpoint['state_dict'])
 
 def save_ckpt(work_dir, model, mode='last'):
+    model_dir = os.path.join(work_dir, 'model')
+    if not os.path.exists(model_dir):
+        os.makedirs(work_dir)
     model_file = os.path.join(work_dir, f'checkpoint-{mode}.pt')
     checkpoint = {
         'state_dict': model.state_dict(),
