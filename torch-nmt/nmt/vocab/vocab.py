@@ -36,10 +36,10 @@ class Vocab(object):
 
     def load(self, data):
         if isinstance(data, dict):
-            self.stoi = data
+            self.stoi.update(data)
             self.itos = [x[0] for x in sorted(data.items(), key=lambda x: x[1])]
         else:
-            self.itos = list(data)
+            self.itos += list(data)
             self.stoi.update({v: k for k, v in enumerate(self.itos)})
         return self
 
