@@ -21,7 +21,7 @@ class EncoderGRU(nn.Module):
         # x: (batch, seqlen), l: (batch,)
         e = self.dropout(self.emb(x))
         # e: (batch, seqlen, n_embed)
-        e = pack_padded_sequence(e, l, batch_first=True)
+        e = pack_padded_sequence(e, l, batch_first=True, enforce_sorted=False)
         o, h = self.rnn(e)
         o, _ = pad_packed_sequence(o, batch_first=True)
         # o: (batch, seqlen, hiddens)
