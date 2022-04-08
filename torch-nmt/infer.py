@@ -13,7 +13,7 @@ def batch_toindex(tokens, vocab):
     tokens = [vocab[token] for token in tokens]
     return tokens
 
-def batch_totoken(indics, vocab):
+def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
     if isinstance(indics, torch.Tensor):
         indics = indics.tolist()
     filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
@@ -22,8 +22,11 @@ def batch_totoken(indics, vocab):
         sent = list(filter(filtered, sent))
         if vocab.EOS_IDX in sent:
             i = sent.index(vocab.EOS_IDX)
-            sent = sent[:i+1]
-        batch.append(vocab.token(sent))
+            sent = sent[:i] if strip_eos else sent[:i+1]
+        if unsqueeze:
+            batch.append([vocab.token(sent)])
+        else:
+            batch.append(vocab.token(sent))
     return batch
 
 def predict(model, sents, src_vocab, tgt_vocab, pred_file=None, max_len=10):
@@ -37,7 +40,7 @@ def predict(model, sents, src_vocab, tgt_vocab, pred_file=None, max_len=10):
             sos = torch.full((src.shape[0], max_len), tgt_vocab.SOS_IDX)
             sos_len = torch.ones((src.shape[0],))
             pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
-            tokens = batch_totoken(pred.argmax(2), tgt_vocab)
+            tokens = batch_totoken(pred.argmax(2), tgt_vocab, strip_eos=True)
             wf.write(' '.join(tokens[0]) + '\n')
 
 
@@ -62,7 +65,7 @@ if __name__ == '__main__':
     load_ckpt(model, args.work_dir)
 
     with open(args.source_file, 'r') as f:
-        sents = [l.strip() for l in f]
+        sents = [l.strip().split(' ') for l in f]
     out_dir = os.path.join(args.work_dir, 'out')
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)

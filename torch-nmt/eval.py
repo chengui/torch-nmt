@@ -10,7 +10,7 @@ from nmt.model import (
 )
 
 
-def batch_totoken(indics, vocab):
+def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
     if isinstance(indics, torch.Tensor):
         indics = indics.tolist()
     filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
@@ -19,8 +19,11 @@ def batch_totoken(indics, vocab):
         sent = list(filter(filtered, sent))
         if vocab.EOS_IDX in sent:
             i = sent.index(vocab.EOS_IDX)
-            sent = sent[:i+1]
-        batch.append(vocab.token(sent))
+            sent = sent[:i] if strip_eos else sent[:i+1]
+        if unsqueeze:
+            batch.append([vocab.token(sent)])
+        else:
+            batch.append(vocab.token(sent))
     return batch
 
 def evaluate_loss(model, data_iter, criterion):
@@ -48,15 +51,16 @@ def evaluate_bleu(model, data_iter, vocab, max_len=10):
         sos_len = torch.ones((src.shape[0],))
         pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
         cnd_seq.extend(batch_totoken(pred.argmax(2), vocab))
-        ref_seq.extend(batch_totoken(gold, vocab))
+        ref_seq.extend(batch_totoken(gold, vocab, unsqueeze=True))
     return bleu_score(cnd_seq, ref_seq)
 
 def evaluate(model, dataset, vocab, batch_size=32, max_len=10):
     criterion = nn.CrossEntropyLoss(ignore_index=vocab.PAD_IDX)
     test_iter = DataLoader(dataset=dataset, batch_size=batch_size)
     test_loss = evaluate_loss(model, test_iter, criterion)
-    test_bleu = evaluate_bleu(model, test_iter, vocab, max_len)
-    print(f'Test Error: loss={test_loss:>3f}, bleu={test_bleu:>3f}')
+    test_bleu, test_pn = evaluate_bleu(model, test_iter, vocab, max_len)
+    print(f'Test Error: loss={test_loss:.3f}, bleu={100*test_bleu:.2f}, '
+          f'precise={",".join(f"{100*pi:.2f}" for pi in test_pn)}')
 
 
 if __name__ == '__main__':
