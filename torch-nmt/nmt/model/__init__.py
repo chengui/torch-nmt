@@ -36,8 +36,8 @@ def load_ckpt(model, work_dir, mode='last'):
 def save_ckpt(work_dir, model, mode='last'):
     model_dir = os.path.join(work_dir, 'model')
     if not os.path.exists(model_dir):
-        os.makedirs(work_dir)
-    model_file = os.path.join(work_dir, f'checkpoint-{mode}.pt')
+        os.makedirs(model_dir)
+    model_file = os.path.join(model_dir, f'checkpoint-{mode}.pt')
     checkpoint = {
         'state_dict': model.state_dict(),
     }
