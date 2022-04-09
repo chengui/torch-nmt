@@ -24,7 +24,7 @@ class BahdanauAttention(nn.Module):
         # out: (batch, 1, hiddens)
         return out
 
-class EncoderBahdanau(nn.Module):
+class BahdanauEncoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
                  use_birnn=False):
         super().__init__()
@@ -54,7 +54,7 @@ class EncoderBahdanau(nn.Module):
             # h: (layers, batch, hiddens)
         return (o, h)
 
-class DecoderBahdanau(nn.Module):
+class BahdanauDecoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
                  use_birnn=False):
         super().__init__()
@@ -90,16 +90,16 @@ class DecoderBahdanau(nn.Module):
         # out: (batch, seqlen, vocab)
         return out, (enc_outs, hidden)
 
-class Seq2SeqBahdanau(nn.Module):
+class BahdanauSeq2Seq(nn.Module):
     def __init__(self, enc_vocab, dec_vocab, **kw):
         super().__init__()
-        self.encoder = EncoderBahdanau(n_vocab=enc_vocab,
+        self.encoder = BahdanauEncoder(n_vocab=enc_vocab,
                                        n_embed=kw.get('enc_embed', 256),
                                        n_hiddens=kw.get('n_hiddens', 512),
                                        n_layers=kw.get('n_layers', 1),
                                        use_birnn=kw.get('use_birnn', False),
                                        dropout=kw.get('dropout', 0.0))
-        self.decoder = DecoderBahdanau(n_vocab=dec_vocab,
+        self.decoder = BahdanauDecoder(n_vocab=dec_vocab,
                                        n_embed=kw.get('dec_embed', 256),
                                        n_hiddens=kw.get('n_hiddens', 512),
                                        use_birnn=kw.get('use_birnn', False),
@@ -133,7 +133,7 @@ class Seq2SeqBahdanau(nn.Module):
         return torch.cat(outs, dim=1)
 
 if __name__ == '__main__':
-    seq2seq = Seq2SeqBahdanau(101, 102, n_layers=2, use_birnn=True)
+    seq2seq = BahdanauSeq2Seq(101, 102, n_layers=2, use_birnn=True)
     enc_x, enc_len = torch.randint(101, (8, 10)), torch.randint(1, 10, (8,))
     dec_x, dec_len = torch.randint(102, (8, 11)), torch.randint(1, 10, (8,))
     outs = seq2seq(enc_x, enc_len, dec_x, dec_len)

@@ -1,14 +1,14 @@
 import os
 import torch
-from nmt.model.seq2seq_gru import Seq2SeqGRU
-from nmt.model.seq2seq_luong import Seq2SeqLuong
-from nmt.model.seq2seq_bahdanau import Seq2SeqBahdanau
+from nmt.model.seq2seq_gru import RNNSeq2Seq
+from nmt.model.seq2seq_luong import LuongSeq2Seq
+from nmt.model.seq2seq_bahdanau import BahdanauSeq2Seq
 from nmt.model.seq2seq_transformer import TransformerSeq2Seq
 
 MODELS = {
-    'rnn':         Seq2SeqGRU,
-    'luong':       Seq2SeqLuong,
-    'bahdanau':    Seq2SeqBahdanau,
+    'rnn':         RNNSeq2Seq,
+    'luong':       LuongSeq2Seq,
+    'bahdanau':    BahdanauSeq2Seq,
     'transformer': TransformerSeq2Seq,
 }
 

@@ -7,7 +7,7 @@ from torch.nn.utils.rnn import (
 )
 
 
-class EncoderGRU(nn.Module):
+class RNNEncoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, n_embed)
@@ -28,7 +28,7 @@ class EncoderGRU(nn.Module):
         # h: (layers, batch, hiddens)
         return o, h
 
-class DecoderGRU(nn.Module):
+class RNNDecoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, n_embed)
@@ -50,15 +50,15 @@ class DecoderGRU(nn.Module):
         # o: (batch, seqlen, vocab)
         return o, hidden
 
-class Seq2SeqGRU(nn.Module):
+class RNNSeq2Seq(nn.Module):
     def __init__(self, enc_vocab, dec_vocab, **kw):
         super().__init__()
-        self.encoder = EncoderGRU(n_vocab=enc_vocab,
+        self.encoder = RNNEncoder(n_vocab=enc_vocab,
                                   n_embed=kw.get('enc_embed', 32),
                                   n_hiddens=kw.get('n_hiddens', 64),
                                   n_layers=kw.get('n_layers', 1),
                                   dropout=kw.get('dropout', 0.0))
-        self.decoder = DecoderGRU(n_vocab=dec_vocab,
+        self.decoder = RNNDecoder(n_vocab=dec_vocab,
                                   n_embed=kw.get('dec_embed', 32),
                                   n_hiddens=kw.get('n_hiddens', 64),
                                   n_layers=kw.get('n_layers', 1),
@@ -85,7 +85,7 @@ class Seq2SeqGRU(nn.Module):
         return torch.cat(outs, dim=1)
 
 if __name__ == '__main__':
-    seq2seq = Seq2SeqGRU(101, 102, n_layers=2)
+    seq2seq = RNNSeq2Seq(101, 102, n_layers=2)
     enc_x, enc_len = torch.randint(101, (8, 10)), torch.randint(1, 10, (8,))
     dec_x, dec_len = torch.randint(102, (8, 11)), torch.randint(1, 10, (8,))
     enc_len, _ = torch.sort(enc_len, dim=0, descending=True)
