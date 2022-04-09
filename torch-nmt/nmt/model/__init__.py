@@ -3,11 +3,13 @@ import torch
 from nmt.model.seq2seq_gru import Seq2SeqGRU
 from nmt.model.seq2seq_luong import Seq2SeqLuong
 from nmt.model.seq2seq_bahdanau import Seq2SeqBahdanau
+from nmt.model.seq2seq_transformer import TransformerSeq2Seq
 
 MODELS = {
-    'gru':      Seq2SeqGRU,
-    'luong':    Seq2SeqLuong,
-    'bahdanau': Seq2SeqBahdanau,
+    'rnn':         Seq2SeqGRU,
+    'luong':       Seq2SeqLuong,
+    'bahdanau':    Seq2SeqBahdanau,
+    'transformer': TransformerSeq2Seq,
 }
 
 def init_weights(m):
@@ -15,7 +17,7 @@ def init_weights(m):
         torch.nn.init.xavier_uniform_(m.weight)
     else:
         for name, param in m.named_parameters():
-            if 'weight' in name:
+            if 'weight' in name and param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param.data)
 
 def create_model(model_type, enc_vocab, dec_vocab, **kw):
