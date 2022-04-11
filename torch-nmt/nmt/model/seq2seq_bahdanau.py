@@ -113,17 +113,17 @@ class BahdanauSeq2Seq(nn.Module):
                                        n_layers=kw.get('n_layers', 1),
                                        dropout=kw.get('dropout', 0.0))
 
-    def make_enc_mask(self, enc_len, maxlen):
-        # enc_len: (batch,)
-        m = torch.arange(maxlen).unsqueeze(0).repeat(enc_len.shape[0], 1)
-        enc_mask = m.lt(enc_len.unsqueeze(1)).unsqueeze(1)
-        # enc_mask: (batch, 1, seqlen)
-        return enc_mask
+    def make_enc_mask(self, x, x_len):
+        # x: (batch, seqlen)
+        bs, ls = x.shape
+        m = torch.arange(ls).unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
+        # m: (batch, 1, seqlen)
+        return m.unsqueeze(1)
 
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
-        mask = self.make_enc_mask(enc_len, enc_x.shape[1])
+        mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_len)
         pred, outs = None, []
         for t in range(dec_x.shape[1]):
