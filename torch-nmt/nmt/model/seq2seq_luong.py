@@ -60,19 +60,19 @@ class LuongEncoder(nn.Module):
                           batch_first=True,
                           dropout=dropout)
         self.dropout = nn.Dropout(dropout)
-        self.birnn = use_birnn
+        self.use_birnn = use_birnn
 
     def forward(self, x, l):
         bs, ls = x.shape
-        # x: (batch, seqlen)
+        # x: (batch, seqlen), l: (batch,)
         e = self.dropout(self.emb(x))
-        # x: (batch, seqlen, embed)
+        # e: (batch, seqlen, embed)
         e = pack_padded_sequence(e, l, batch_first=True, enforce_sorted=False)
         o, h = self.rnn(e)
         o, _ = pad_packed_sequence(o, batch_first=True, total_length=ls)
         # o: (batch, seqlen, hiddens*dir)
         # h: (layers*dir, batch, hiddens)
-        if self.birnn:
+        if self.use_birnn:
             # h: (layers*2, batch, hiddens)
             _, batch_size, n_hiddens = h.shape
             h = h.view(-1, 2, batch_size, n_hiddens)
@@ -134,8 +134,8 @@ class LuongSeq2Seq(nn.Module):
         return m.unsqueeze(1)
 
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
-        # enc_x: (batch, seqlen)
-        # dec_x: (batch, seqlen)
+        # enc_x: (batch, seqlen), enc_len: (batch,)
+        # dec_x: (batch, seqlen), dec_len: (batch,)
         mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_len)
         pred, outs = None, []
@@ -146,10 +146,10 @@ class LuongSeq2Seq(nn.Module):
                 x = pred
             # x: (batch,)
             out, state = self.decoder(x.unsqueeze(-1), state, mask)
+            outs.append(out)
             # out: (batch, 1, vocab)
             pred = out.argmax(2).squeeze(1)
             # pred: (batch,)
-            outs.append(out)
         return torch.cat(outs, dim=1)
 
 if __name__ == '__main__':
