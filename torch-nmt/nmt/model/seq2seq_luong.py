@@ -2,6 +2,10 @@ import torch
 import random
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.utils.rnn import (
+    pack_padded_sequence,
+    pad_packed_sequence
+)
 
 
 class LuongAttention(nn.Module):
@@ -57,21 +61,23 @@ class LuongEncoder(nn.Module):
         self.birnn = use_birnn
 
     def forward(self, x, l):
+        bs, ls = x.shape
         # x: (batch, seqlen)
-        x = self.dropout(self.emb(x))
+        e = self.dropout(self.emb(x))
         # x: (batch, seqlen, embed)
-        outs, hidden = self.rnn(x)
-        # outs: (batch, seqlen, hiddens*dir)
-        # hidden: (layers*dir, batch, hiddens)
+        e = pack_padded_sequence(e, l, batch_first=True, enforce_sorted=False)
+        o, h = self.rnn(e)
+        o, _ = pad_packed_sequence(o, batch_first=True, total_length=ls)
+        # o: (batch, seqlen, hiddens*dir)
+        # h: (layers*dir, batch, hiddens)
         if self.birnn:
-            # hidden: (layers*2, batch, hiddens)
-            _, batch_size, n_hiddens = hidden.shape
-            hidden = hidden.view(-1, 2, batch_size, n_hiddens)
-            # hidden: (layers, 2, batch, hiddens)
-            hidden = torch.stack([torch.cat((h[0], h[1]), dim=1)
-                                  for h in hidden])
-        # hidden: (layers, batch, hiddens*dir)
-        return (outs, hidden)
+            # h: (layers*2, batch, hiddens)
+            _, batch_size, n_hiddens = h.shape
+            h = h.view(-1, 2, batch_size, n_hiddens)
+            # h: (layers, 2, batch, hiddens)
+            h = torch.stack([torch.cat((i[0], i[1]), dim=1) for i in h])
+        # h: (layers, batch, hiddens*dir)
+        return (o, h)
 
 class LuongDecoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,

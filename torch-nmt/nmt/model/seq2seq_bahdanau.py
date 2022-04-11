@@ -2,6 +2,10 @@ import torch
 import random
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.utils.rnn import (
+    pack_padded_sequence,
+    pad_packed_sequence
+)
 
 
 class BahdanauAttention(nn.Module):
@@ -32,18 +36,21 @@ class BahdanauEncoder(nn.Module):
         self.rnn = nn.GRU(n_embed, n_hiddens,
                           num_layers=n_layers,
                           bidirectional=use_birnn,
-                          dropout=dropout,
-                          batch_first=True)
+                          batch_first=True,
+                          dropout=dropout)
         self.dropout = nn.Dropout(dropout)
         self.use_birnn = use_birnn
         if self.use_birnn :
             self.dense = nn.Linear(n_layers*2, n_layers)
 
     def forward(self, x, l):
+        bs, ls = x.shape
         # x: (batch, seqlen), l: (batch,)
         e = self.dropout(self.emb(x))
         # e: (batch, seqlen, embed)
+        e = pack_padded_sequence(e, l, batch_first=True, enforce_sorted=False)
         o, h = self.rnn(e)
+        o, _ = pad_packed_sequence(o, batch_first=True, total_length=ls)
         # o: (batch, seqlen, hiddens*dir)
         # h: (layers*dir, batch, hiddens)
         if self.use_birnn:
