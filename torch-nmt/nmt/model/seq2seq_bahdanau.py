@@ -69,8 +69,8 @@ class BahdanauDecoder(nn.Module):
         self.emb = nn.Embedding(n_vocab, n_embed)
         self.rnn = nn.GRU(n_embed+n_hiddens*self.n_dir, n_hiddens,
                           num_layers=n_layers,
-                          dropout=dropout,
-                          batch_first=True)
+                          batch_first=True,
+                          dropout=dropout)
         self.attn = BahdanauAttention(n_hiddens*self.n_dir)
         self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
@@ -133,10 +133,10 @@ class BahdanauSeq2Seq(nn.Module):
                 x = pred
             # x: (batch,)
             out, state = self.decoder(x.unsqueeze(-1), state, mask)
+            outs.append(out)
             # out: (batch, 1, vocab)
             pred = out.argmax(2).squeeze(1)
             # pred: (batch,)
-            outs.append(out)
         return torch.cat(outs, dim=1)
 
 if __name__ == '__main__':
