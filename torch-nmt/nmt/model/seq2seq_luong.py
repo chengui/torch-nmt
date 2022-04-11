@@ -57,8 +57,8 @@ class LuongEncoder(nn.Module):
         self.rnn = nn.GRU(n_embed, n_hiddens,
                           num_layers=n_layers,
                           bidirectional=use_birnn,
-                          dropout=dropout,
-                          batch_first=True)
+                          batch_first=True,
+                          dropout=dropout)
         self.dropout = nn.Dropout(dropout)
         self.birnn = use_birnn
 
@@ -89,8 +89,8 @@ class LuongDecoder(nn.Module):
         self.emb = nn.Embedding(n_vocab, n_embed)
         self.rnn = nn.GRU(n_embed, n_hiddens,
                           num_layers=n_layers,
-                          dropout=dropout,
-                          batch_first=True)
+                          batch_first=True,
+                          dropout=dropout)
         self.attn = LuongAttention(n_hiddens)
         self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
