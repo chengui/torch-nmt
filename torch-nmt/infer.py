@@ -1,6 +1,7 @@
 import os
 import torch
 from nmt.vocab import load_vocab
+from nmt.dataset.data import numerical
 from nmt.model import (
     create_model,
     load_ckpt,
@@ -13,7 +14,7 @@ def batch_toindex(tokens, vocab):
     tokens = [vocab[token] for token in tokens]
     return tokens
 
-def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
+def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=True):
     if isinstance(indics, torch.Tensor):
         indics = indics.tolist()
     filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
@@ -29,19 +30,20 @@ def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
             batch.append(vocab.token(sent))
     return batch
 
-def predict(model, sents, src_vocab, tgt_vocab, pred_file=None, max_len=10):
+def predict(model, sents, src_vocab, tgt_vocab, pred_file=None, maxlen=20):
+    sos_idx, pad_idx = src_vocab.SOS_IDX, src_vocab.PAD_IDX
+    sos_indic, sos_len_indic = [sos_idx] + [pad_idx] * (maxlen-1), [1]
+    model.eval()
+    pred_seq = []
+    for _, sent in enumerate(sents):
+        src, src_len = numerical([sent], src_vocab)
+        sos = torch.LongTensor(sos_indic).unsqueeze(0).repeat(src.shape[0], 1)
+        sos_len = torch.LongTensor(sos_len_indic).repeat(src.shape[0])
+        pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
+        pred_seq.extend(batch_totoken(pred.argmax(2), tgt_vocab))
     with open(pred_file, 'w', encoding='utf-8') as wf:
-        model.eval()
-        src_indics = batch_toindex(sents, src_vocab)
-        for _, src_indic in enumerate(src_indics):
-            src_indic = [src_vocab.SOS_IDX] + src_indic + [src_vocab.EOS_IDX]
-            src = torch.tensor([src_indic])
-            src_len = torch.tensor([len(src_indic)])
-            sos = torch.full((src.shape[0], max_len), tgt_vocab.SOS_IDX)
-            sos_len = torch.ones((src.shape[0],))
-            pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
-            tokens = batch_totoken(pred.argmax(2), tgt_vocab, strip_eos=True)
-            wf.write(' '.join(tokens[0]) + '\n')
+        for tokens in pred_seq:
+            wf.write(' '.join(tokens) + '\n')
 
 
 if __name__ == '__main__':
