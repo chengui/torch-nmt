@@ -1,6 +1,6 @@
 import os
 import torch
-from nmt.model.seq2seq_gru import RNNSeq2Seq
+from nmt.model.seq2seq_rnn import RNNSeq2Seq
 from nmt.model.seq2seq_luong import LuongSeq2Seq
 from nmt.model.seq2seq_bahdanau import BahdanauSeq2Seq
 from nmt.model.seq2seq_transformer import TransformerSeq2Seq
