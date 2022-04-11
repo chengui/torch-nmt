@@ -56,7 +56,7 @@ if __name__ == '__main__':
                         help='working dir to output')
     parser.add_argument('-f', '--source-file', required=True,
                         help='source file with preprocessed data')
-    parser.add_argument('-l', '--max-len', type=int, default=10,
+    parser.add_argument('-l', '--max-length', type=int, default=10,
                         help='maxium length to predict')
     args = parser.parse_args()
 
@@ -73,4 +73,4 @@ if __name__ == '__main__':
         os.makedirs(out_dir)
     pred_name = os.path.basename(args.source_file) + '.pred'
     pred_file = os.path.join(out_dir, pred_name)
-    predict(model, sents, src_vocab, tgt_vocab, pred_file, args.max_len)
+    predict(model, sents, src_vocab, tgt_vocab, pred_file, args.max_length)

@@ -73,7 +73,7 @@ if __name__ == '__main__':
                         help='working dir to perform')
     parser.add_argument('-b', '--batch-size', type=int, default=32,
                         help='batch size of dataloader')
-    parser.add_argument('-l', '--max-len', type=int, default=10,
+    parser.add_argument('-l', '--max-length', type=int, default=10,
                         help='maxium length to predict')
     args = parser.parse_args()
 
@@ -86,4 +86,4 @@ if __name__ == '__main__':
                          dec_vocab=len(tgt_vocab))
 
     load_ckpt(model, args.work_dir, mode='best')
-    evaluate(model, test_set, tgt_vocab, args.batch_size, args.max_len)
+    evaluate(model, test_set, tgt_vocab, args.batch_size, args.max_length)
