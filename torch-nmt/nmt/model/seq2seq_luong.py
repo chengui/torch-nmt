@@ -18,7 +18,7 @@ class LuongAttention(nn.Module):
             self.w = nn.Linear(n_hiddens*2, n_hiddens)
             self.v = torch.FloatTensor(n_hiddens)
 
-    def forward(self, q, k, v, mask):
+    def forward(self, q, k, v, mask=None):
         # q: (batch, 1, hiddens)
         # k: (batch, seqlen, hiddens)
         # v: (batch, seqlen, hiddens)
@@ -28,9 +28,11 @@ class LuongAttention(nn.Module):
             a = self.general(q, k)
         elif self.score_fn == 'concat':
             a = self.concat(q, k)
-        # a: (batch, seqlen)
-        w = F.softmax(a, dim=-1)
-        c = torch.bmm(w.unsqueeze(1), v)
+        # a: (batch, 1, seqlen)
+        w = a.unsqueeze(1)
+        if mask is not None:
+            w = F.softmax(w.masked_fill(mask==0, -1e10), dim=-1)
+        c = torch.bmm(w, v)
         # c: (batch, 1, hiddens)
         return c
 

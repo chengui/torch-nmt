@@ -14,7 +14,7 @@ class BahdanauAttention(nn.Module):
         self.w = nn.Linear(n_hiddens*2, n_hiddens)
         self.v = nn.Linear(n_hiddens, 1, bias=False)
 
-    def forward(self, q, k, v, mask):
+    def forward(self, q, k, v, mask=None):
         # q: (batch, seqlen, hiddens)
         # k: (batch, seqlen, hiddens)
         # v: (batch, seqlen, hiddens)
@@ -22,11 +22,12 @@ class BahdanauAttention(nn.Module):
         # a: (batch, seqlen, hiddens)
         w = self.v(torch.tanh(a)).permute(0, 2, 1)
         # w: (batch, 1, seqlen)
-        w = F.softmax(w.masked_fill(mask==0, -1e10), dim=-1)
+        if mask is not None:
+            w = F.softmax(w.masked_fill(mask==0, -1e10), dim=-1)
         # w: (batch, 1, seqlen)
-        out = torch.bmm(w, v)
-        # out: (batch, 1, hiddens)
-        return out
+        c = torch.bmm(w, v)
+        # c: (batch, 1, hiddens)
+        return c
 
 class BahdanauEncoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
