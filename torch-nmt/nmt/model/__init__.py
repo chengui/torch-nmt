@@ -21,7 +21,7 @@ def init_weights(m):
                 torch.nn.init.xavier_uniform_(param.data)
 
 def create_model(model_type, enc_vocab, dec_vocab, **kw):
-    seq2seq = MODELS[model_type](enc_vocab, dec_vocab)
+    seq2seq = MODELS[model_type](enc_vocab, dec_vocab, **kw)
     seq2seq.apply(init_weights)
     return seq2seq
 
