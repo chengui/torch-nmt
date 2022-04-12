@@ -8,6 +8,13 @@ from nmt.model import (
 )
 
 
+def init_target(batch_size, vocab, maxlen):
+    sos_idx, pad_idx = vocab.SOS_IDX, vocab.PAD_IDX
+    sos = [sos_idx] + [pad_idx]*(maxlen-1)
+    sos = torch.LongTensor([sos]).repeat(batch_size, 1)
+    sos_len = torch.LongTensor([1]).repeat(batch_size)
+    return sos, sos_len
+
 def batch_toindex(tokens, vocab):
     if not isinstance(tokens, (tuple, list)):
         tokens = [tokens]
@@ -31,14 +38,13 @@ def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=True):
     return batch
 
 def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None, maxlen=10):
-    sos_idx, pad_idx = src_vocab.SOS_IDX, src_vocab.PAD_IDX
-    sos_indic, sos_len_indic = [sos_idx] + [pad_idx] * (maxlen-1), [1]
     model.eval()
     pred_seq = []
     for _, sent in enumerate(sents):
         src, src_len = numerical([sent], src_vocab, maxlen=maxlen)
-        sos = torch.LongTensor(sos_indic).to(device).unsqueeze(0).repeat(src.shape[0], 1)
-        sos_len = torch.LongTensor(sos_len_indic).to(device).repeat(src.shape[0])
+        src, src_len = src.to(device), src_len.to(device)
+        sos, sos_len = init_target(src.shape[0], src_vocab, maxlen)
+        sos, sos_len = sos.to(device), sos_len.to(device)
         pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
         pred_seq.extend(batch_totoken(pred.argmax(2), tgt_vocab))
     with open(pred_file, 'w', encoding='utf-8') as wf:

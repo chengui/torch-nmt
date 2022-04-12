@@ -10,6 +10,13 @@ from nmt.model import (
 )
 
 
+def init_target(batch_size, vocab, maxlen):
+    sos_idx, pad_idx = vocab.SOS_IDX, vocab.PAD_IDX
+    sos = [sos_idx] + [pad_idx]*(maxlen-1)
+    sos = torch.LongTensor([sos]).repeat(batch_size, 1)
+    sos_len = torch.LongTensor([1]).repeat(batch_size)
+    return sos, sos_len
+
 def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
     if isinstance(indics, torch.Tensor):
         indics = indics.tolist()
@@ -47,8 +54,8 @@ def evaluate_bleu(model, data_iter, vocab, device, maxlen):
     for _, batch in enumerate(data_iter):
         src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
         tgt, gold = tgt[:, :-1], tgt[:, 1:]
-        sos = torch.full((src.shape[0], maxlen), vocab.SOS_IDX).to(device)
-        sos_len = torch.ones((src.shape[0],)).to(device)
+        sos, sos_len = init_target(src.shape[0], src_vocab, maxlen)
+        sos, sos_len = sos.to(device), sos_len.to(device)
         pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
         cnd_seq.extend(batch_totoken(pred.argmax(2), vocab))
         ref_seq.extend(batch_totoken(gold, vocab, unsqueeze=True))
