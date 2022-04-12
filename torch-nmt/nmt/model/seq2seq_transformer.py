@@ -1,3 +1,4 @@
+import math
 import torch
 from torch import nn
 
@@ -12,25 +13,24 @@ class MultiHeadAttention(nn.Module):
         self.w_v = nn.Linear(n_hiddens, n_hiddens)
         self.w_o = nn.Linear(n_hiddens, n_hiddens)
         self.dropout = nn.Dropout(dropout)
-        self.scale = torch.sqrt(torch.FloatTensor([self.h_hiddens]))
 
     def forward(self, q, k, v, mask=None):
         bs, ls, hs = q.shape
         # q, k, v: (batch, srclen/tgtlen, hidden)
         q, k, v = self.w_q(q), self.w_k(k), self.w_v(v)
         # q, k, v: (batch, srclen/tgtlen, hidden)
-        q = q.view(bs, -1, self.n_heads, self.h_hiddens).transpose(1, 2)
-        k = k.view(bs, -1, self.n_heads, self.h_hiddens).transpose(1, 2)
-        v = v.view(bs, -1, self.n_heads, self.h_hiddens).transpose(1, 2)
+        q = q.view(bs, -1, self.n_heads, self.h_hiddens).permute(0, 2, 1, 3)
+        k = k.view(bs, -1, self.n_heads, self.h_hiddens).permute(0, 2, 1, 3)
+        v = v.view(bs, -1, self.n_heads, self.h_hiddens).permute(0, 2, 1, 3)
         # q, k, v: (batch, head, srclen/tgtlen, h_hiddens)
-        e = torch.matmul(q, k.transpose(2, 3)) / self.scale.to(q.device)
+        e = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(self.h_hiddens)
         # e: (batch, head, seqlen, seqlen)
         if mask is not None:
-            e = e.masked_fill(mask == 0, -1e10)
+            e = e.masked_fill(mask==0, -1e10)
         a = torch.softmax(e, dim=-1)
         # a: (batch, head, seqlen, seqlen)
         z = torch.matmul(self.dropout(a), v)
-        z = z.transpose(1, 2).contiguous().view(bs, -1, hs)
+        z = z.permute(0, 2, 1, 3).contiguous().view(bs, -1, hs)
         # z: (batch, seqlen, hidden)
         o = self.w_o(z)
         # o: (batch, seqlen, hidden)
@@ -61,18 +61,21 @@ class AddNorm(nn.Module):
     def forward(self, x, y):
         return self.norm(x + self.dropout(y))
 
-class PositionEncoding(nn.Module):
-    def __init__(self, n_position, n_hiddens):
+class PositionalEncoding(nn.Module):
+    def __init__(self, n_hiddens, n_position, dropout):
         super().__init__()
-        self.pos_emb = nn.Embedding(n_position, n_hiddens)
-        self.scale = torch.sqrt(torch.FloatTensor([n_hiddens]))
+        i = torch.arange(n_position).float().reshape(-1, 1)
+        j = torch.arange(0, n_hiddens, 2).float()
+        self.pe = torch.zeros(1, n_position, n_hiddens)
+        self.pe[:,:,0::2] = torch.sin(i / (10000**(j/n_hiddens)))
+        self.pe[:,:,1::2] = torch.cos(i / (10000**(j/n_hiddens)))
+        self.dropout = nn.Dropout(dropout)
+        self.scale = math.sqrt(n_hiddens)
 
     def forward(self, x):
-        bs, ls, _ = x.shape
         # x: (batch, srclen, embed)
-        p = torch.arange(ls).unsqueeze(0).repeat(bs, 1)
-        # p: (batch, seqlen)
-        return (x * self.scale.to(x.device)) + self.pos_emb(p)
+        x = (x * self.scale) + self.pe[:,:x.shape[1],:].to(x.device)
+        return self.dropout(x)
 
 class EncoderLayer(nn.Module):
     def __init__(self, n_heads, n_hiddens, ff_hiddens, dropout):
@@ -113,16 +116,15 @@ class TransformerEncoder(nn.Module):
                  n_position=100, dropout=0.1):
         super().__init__()
         self.tok_emb = nn.Embedding(n_vocab, n_hiddens)
-        self.pos_enc = PositionEncoding(n_position, n_hiddens)
+        self.pos_enc = PositionalEncoding(n_hiddens, n_position, dropout)
         self.layers = nn.ModuleList([
             EncoderLayer(n_heads, n_hiddens, ff_hiddens, dropout)
             for _ in range(n_layers)])
-        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mask):
         bs, ls = x.shape
         # x: (batch, srclen)
-        x = self.dropout(self.pos_enc(self.tok_emb(x)))
+        x = self.pos_enc(self.tok_emb(x))
         # x: (batch, srclen, hidden)
         for layer in self.layers:
             x = layer(x, mask)
@@ -131,20 +133,19 @@ class TransformerEncoder(nn.Module):
 
 class TransformerDecoder(nn.Module):
     def __init__(self, n_vocab, n_layers, n_heads, n_hiddens, ff_hiddens,
-                 n_position=100, dropout=0.1):
+                 n_position=1000, dropout=0.1):
         super().__init__()
         self.tok_emb = nn.Embedding(n_vocab, n_hiddens)
-        self.pos_enc = PositionEncoding(n_position, n_hiddens)
+        self.pos_enc = PositionalEncoding(n_hiddens, n_position, dropout)
         self.layers = nn.ModuleList([
             DecoderLayer(n_heads, n_hiddens, ff_hiddens, dropout)
             for _ in range(n_layers)])
         self.out = nn.Linear(n_hiddens, n_vocab)
-        self.dropout = nn.Dropout(dropout)
 
     def forward(self, y, enc_x, mask, enc_mask):
         bs, ls = y.shape
         # y: (batch, srclen)
-        y = self.dropout(self.pos_enc(self.tok_emb(y)))
+        y = self.pos_enc(self.tok_emb(y))
         # y: (batch, srclen, embed)
         for layer in self.layers:
             y = layer(y, enc_x, mask, enc_mask)
@@ -155,19 +156,19 @@ class TransformerSeq2Seq(nn.Module):
     def __init__(self, enc_vocab, dec_vocab, **kw):
         super().__init__()
         self.encoder = TransformerEncoder(n_vocab=enc_vocab,
-                                          n_layers=kw.get('n_layers', 2),
-                                          n_heads=kw.get('n_heads', 4),
+                                          n_layers=kw.get('n_layers', 6),
+                                          n_heads=kw.get('n_heads', 8),
                                           n_hiddens=kw.get('n_hiddens', 512),
-                                          ff_hiddens=kw.get('ff_hiddens', 1024),
+                                          ff_hiddens=kw.get('ff_hiddens', 2048),
                                           n_position=kw.get('n_position', 100),
-                                          dropout=kw.get('dropout', 0.0))
+                                          dropout=kw.get('dropout', 0.1))
         self.decoder = TransformerDecoder(n_vocab=dec_vocab,
-                                          n_layers=kw.get('n_layers', 2),
-                                          n_heads=kw.get('n_heads', 4),
+                                          n_layers=kw.get('n_layers', 6),
+                                          n_heads=kw.get('n_heads', 8),
                                           n_hiddens=kw.get('n_hiddens', 512),
                                           ff_hiddens=kw.get('ff_hiddens', 1024),
                                           n_position=kw.get('n_position', 100),
-                                          dropout=kw.get('dropout', 0.0))
+                                          dropout=kw.get('dropout', 0.1))
 
     def make_enc_mask(self, x, x_len):
         bs, ls = x.shape
