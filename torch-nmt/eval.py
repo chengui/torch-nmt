@@ -16,7 +16,7 @@ from nmt.model import (
 )
 
 
-def evaluate_loss(model, data_iter, criterion):
+def evaluate_loss(model, data_iter, criterion, device):
     model.eval()
     test_loss = 0
     for _, batch in enumerate(data_iter):
