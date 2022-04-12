@@ -1,37 +1,20 @@
-import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from nmt.dataset.data import init_target
 from nmt.dataset import create_dataset
-from nmt.vocab import load_vocab
-from nmt.util import bleu_score
+from nmt.vocab import (
+    load_vocab,
+    batch_totoken,
+)
+from nmt.util import (
+    get_device,
+    bleu_score,
+)
 from nmt.model import (
     create_model,
     load_ckpt,
 )
 
-
-def init_target(batch_size, vocab, maxlen):
-    sos_idx, pad_idx = vocab.SOS_IDX, vocab.PAD_IDX
-    sos = [sos_idx] + [pad_idx]*(maxlen-1)
-    sos = torch.LongTensor([sos]).repeat(batch_size, 1)
-    sos_len = torch.LongTensor([1]).repeat(batch_size)
-    return sos, sos_len
-
-def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
-    if isinstance(indics, torch.Tensor):
-        indics = indics.tolist()
-    filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
-    batch = []
-    for sent in indics:
-        sent = list(filter(filtered, sent))
-        if vocab.EOS_IDX in sent:
-            i = sent.index(vocab.EOS_IDX)
-            sent = sent[:i] if strip_eos else sent[:i+1]
-        if unsqueeze:
-            batch.append([vocab.token(sent)])
-        else:
-            batch.append(vocab.token(sent))
-    return batch
 
 def evaluate_loss(model, data_iter, criterion):
     model.eval()
@@ -69,13 +52,6 @@ def evaluate(model, dataset, vocab, device=None, batch_size=32, max_length=10):
                                        maxlen=max_length)
     print(f'Test Error: loss={test_loss:.3f}, bleu={100*test_bleu:.2f}, '
           f'precise={",".join(f"{100*pi:.2f}" for pi in test_pn)}')
-
-def get_device(cpu_only=False):
-    has_gpu = torch.cuda.is_available()
-    if cpu_only or not has_gpu:
-        return torch.device('cpu')
-    else:
-        return torch.device('cuda')
 
 
 if __name__ == '__main__':

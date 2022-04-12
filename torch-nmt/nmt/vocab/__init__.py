@@ -1,4 +1,5 @@
 import os
+import torch
 from nmt.vocab.vocab import Vocab
 
 
@@ -28,3 +29,25 @@ def save_vocab(src_vocab, tgt_vocab, work_dir):
     src_vocab.to_file(src_file)
     tgt_file = os.path.join(vocab_dir, TGT_VOCAB)
     tgt_vocab.to_file(tgt_file)
+
+def batch_toindex(tokens, vocab):
+    if not isinstance(tokens, (tuple, list)):
+        tokens = [tokens]
+    tokens = [vocab[token] for token in tokens]
+    return tokens
+
+def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
+    if isinstance(indics, torch.Tensor):
+        indics = indics.tolist()
+    filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
+    batch = []
+    for sent in indics:
+        sent = list(filter(filtered, sent))
+        if vocab.EOS_IDX in sent:
+            i = sent.index(vocab.EOS_IDX)
+            sent = sent[:i] if strip_eos else sent[:i+1]
+        if unsqueeze:
+            batch.append([vocab.token(sent)])
+        else:
+            batch.append(vocab.token(sent))
+    return batch

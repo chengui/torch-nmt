@@ -3,7 +3,10 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from nmt.dataset import create_dataset
 from nmt.vocab import load_vocab
-from nmt.util import clip_grad
+from nmt.util import (
+    clip_grad,
+    get_device,
+)
 from nmt.model import (
     create_model,
     load_ckpt,
@@ -74,13 +77,6 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
 
         print(f'epoch {epoch+1}: train_loss={train_loss:>3f}, '
               f'valid_loss={valid_loss:>3f}')
-
-def get_device(cpu_only=False):
-    has_gpu = torch.cuda.is_available()
-    if cpu_only or not has_gpu:
-        return torch.device('cpu')
-    else:
-        return torch.device('cuda')
 
 
 if __name__ == '__main__':

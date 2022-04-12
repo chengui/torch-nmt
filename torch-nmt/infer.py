@@ -1,43 +1,21 @@
 import os
-import torch
-from nmt.vocab import load_vocab
-from nmt.dataset.data import numerical
+from nmt.util import get_device
+from nmt.vocab import (
+    load_vocab,
+    batch_totoken,
+)
+from nmt.dataset.data import (
+    numerical,
+    init_target,
+)
 from nmt.model import (
     create_model,
     load_ckpt,
 )
 
 
-def init_target(batch_size, vocab, maxlen):
-    sos_idx, pad_idx = vocab.SOS_IDX, vocab.PAD_IDX
-    sos = [sos_idx] + [pad_idx]*(maxlen-1)
-    sos = torch.LongTensor([sos]).repeat(batch_size, 1)
-    sos_len = torch.LongTensor([1]).repeat(batch_size)
-    return sos, sos_len
-
-def batch_toindex(tokens, vocab):
-    if not isinstance(tokens, (tuple, list)):
-        tokens = [tokens]
-    tokens = [vocab[token] for token in tokens]
-    return tokens
-
-def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=True):
-    if isinstance(indics, torch.Tensor):
-        indics = indics.tolist()
-    filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
-    batch = []
-    for sent in indics:
-        sent = list(filter(filtered, sent))
-        if vocab.EOS_IDX in sent:
-            i = sent.index(vocab.EOS_IDX)
-            sent = sent[:i] if strip_eos else sent[:i+1]
-        if unsqueeze:
-            batch.append([vocab.token(sent)])
-        else:
-            batch.append(vocab.token(sent))
-    return batch
-
-def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None, maxlen=10):
+def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None,
+            maxlen=10):
     model.eval()
     pred_seq = []
     for _, sent in enumerate(sents):
@@ -46,17 +24,11 @@ def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None, max
         sos, sos_len = init_target(src.shape[0], src_vocab, maxlen)
         sos, sos_len = sos.to(device), sos_len.to(device)
         pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
-        pred_seq.extend(batch_totoken(pred.argmax(2), tgt_vocab))
+        tokens = batch_totoken(pred.argmax(2), tgt_vocab, strip_eos=True)
+        pred_seq.extend(tokens)
     with open(pred_file, 'w', encoding='utf-8') as wf:
         for (sent, pred) in zip(sents, pred_seq):
             wf.write(' '.join(sent) + '\t' + ' '.join(pred) + '\n')
-
-def get_device(cpu_only=False):
-    has_gpu = torch.cuda.is_available()
-    if cpu_only or not has_gpu:
-        return torch.device('cpu')
-    else:
-        return torch.device('cuda')
 
 
 if __name__ == '__main__':
