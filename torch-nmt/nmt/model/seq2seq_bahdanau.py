@@ -11,21 +11,27 @@ from torch.nn.utils.rnn import (
 class BahdanauAttention(nn.Module):
     def __init__(self, n_hiddens):
         super().__init__()
-        self.w = nn.Linear(n_hiddens*2, n_hiddens)
-        self.v = nn.Linear(n_hiddens, 1, bias=False)
+        self.w_a = nn.Linear(n_hiddens*2, n_hiddens)
+        self.v_a = nn.Linear(n_hiddens, 1, bias=False)
 
     def forward(self, q, k, v, mask=None):
-        # q: (batch, seqlen, hiddens)
+        # q: (batch, hiddens0)
         # k: (batch, seqlen, hiddens)
         # v: (batch, seqlen, hiddens)
-        a = self.w(torch.cat([q, k], dim=-1))
-        # a: (batch, seqlen, hiddens)
-        w = self.v(torch.tanh(a)).permute(0, 2, 1)
-        # w: (batch, 1, seqlen)
+        n_dir = k.shape[2] // q.shape[1]
+        q = q.unsqueeze(1).repeat(1, k.shape[1], n_dir)
+        # q: (batch, seqlen, hiddens)
+        cat = torch.cat([q, k], dim=-1)
+        # cat: (batch, seqlen, hiddens)
+        e = self.v_a(torch.tanh(self.w_a(cat)))
+        # e: (batch, seqlen, 1)
+        e = e.permute(0, 2, 1)
+        # e: (batch, 1, seqlen)
         if mask is not None:
-            w = F.softmax(w.masked_fill(mask==0, -1e10), dim=-1)
-        # w: (batch, 1, seqlen)
-        c = torch.bmm(w, v)
+            e = e.masked_fill(mask==0, -1e10)
+        a = F.softmax(e, dim=-1)
+        # a: (batch, 1, seqlen)
+        c = torch.bmm(a, v)
         # c: (batch, 1, hiddens)
         return c
 
@@ -59,7 +65,8 @@ class BahdanauEncoder(nn.Module):
             h = self.dense(h.permute(1, 2, 0))
             # h: (batch, hiddens, layers)
             h = torch.tanh(h.permute(2, 0, 1))
-            # h: (layers, batch, hiddens)
+        # o: (batch, seqlen, hiddens*dir)
+        # h: (layers, batch, hiddens)
         return (o, h)
 
 class BahdanauDecoder(nn.Module):
@@ -72,31 +79,33 @@ class BahdanauDecoder(nn.Module):
                           num_layers=n_layers,
                           batch_first=True,
                           dropout=dropout)
-        self.attn = BahdanauAttention(n_hiddens*self.n_dir)
-        self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
+        self.att = BahdanauAttention(n_hiddens*self.n_dir)
+        self.out = nn.Linear(n_hiddens, n_vocab)
+        # self.out = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, state, mask):
-        # x: (batch, seqlen)
-        enc_outs, hidden = state
-        # enc_outs: (batch, seqlen, hiddens*dir)
-        # hidden: (layers, batch, hiddens)
-        e = self.dropout(self.emb(x))
+    def forward(self, y, state, mask):
+        # y: (batch, seqlen)
+        ctx, s = state
+        # ctx: (batch, seqlen, hiddens*dir)
+        # s: (layers, batch, hiddens)
+        e = self.dropout(self.emb(y))
         # e: (batch, seqlen, embed)
-        h = hidden[-1].unsqueeze(1).repeat(1, enc_outs.shape[1], self.n_dir)
-        c = self.attn(h, enc_outs, enc_outs, mask)
-        # c: (batch, seqlen, hiddens*dir)
-        a = torch.cat([e, c], dim=-1)
-        # a: (batch, seqlen, embed+hiddens*dir)
-        o, hidden = self.rnn(a, hidden)
+        c = self.att(s[-1], ctx, ctx, mask)
+        # c: (batch, seqlen, hiddens)
+        cat = torch.cat([e, c], dim=-1)
+        # cat: (batch, seqlen, embed+hiddens*dir)
+        o, s = self.rnn(cat, s)
         # o: (batch, seqlen, hiddens)
-        # hidden: (layers, batch, hiddens)
-        h = hidden[-1].unsqueeze(1).repeat(1, e.shape[1], 1)
-        # h: (batch, seqlen, hiddens)
-        o = torch.cat([e, h, o], dim=-1)
-        out = self.dense(o)
-        # out: (batch, seqlen, vocab)
-        return out, (enc_outs, hidden)
+        # s: (layers, batch, hiddens)
+        ## h = h[-1].unsqueeze(1).repeat(1, e.shape[1], 1)
+        ## o = torch.cat([e, h, o], dim=-1)
+        # o: (batch, seqlen, embed+hiddens*2)
+        o = self.out(o)
+        # o: (batch, seqlen, vocab)
+        # ctx: (batch, seqlen, hiddens*dir)
+        # s: (layers, batch, hiddens)
+        return o, (ctx, s)
 
 class BahdanauSeq2Seq(nn.Module):
     def __init__(self, enc_vocab, dec_vocab, **kw):
@@ -110,8 +119,8 @@ class BahdanauSeq2Seq(nn.Module):
         self.decoder = BahdanauDecoder(n_vocab=dec_vocab,
                                        n_embed=kw.get('dec_embed', 256),
                                        n_hiddens=kw.get('n_hiddens', 512),
-                                       use_birnn=kw.get('use_birnn', False),
                                        n_layers=kw.get('n_layers', 1),
+                                       use_birnn=kw.get('use_birnn', False),
                                        dropout=kw.get('dropout', 0.0))
 
     def make_enc_mask(self, x, x_len):
@@ -124,7 +133,7 @@ class BahdanauSeq2Seq(nn.Module):
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
-        mask = self.make_enc_mask(enc_x, enc_len)
+        enc_mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_len)
         pred, outs = None, []
         for t in range(dec_x.shape[1]):
@@ -133,7 +142,7 @@ class BahdanauSeq2Seq(nn.Module):
             else:
                 x = pred
             # x: (batch,)
-            out, state = self.decoder(x.unsqueeze(-1), state, mask)
+            out, state = self.decoder(x.unsqueeze(-1), state, enc_mask)
             outs.append(out)
             # out: (batch, 1, vocab)
             pred = out.argmax(2).squeeze(1)
@@ -142,7 +151,7 @@ class BahdanauSeq2Seq(nn.Module):
 
 if __name__ == '__main__':
     seq2seq = BahdanauSeq2Seq(101, 102, n_layers=2, use_birnn=True)
-    enc_x, enc_len = torch.randint(101, (8, 10)), torch.randint(1, 10, (8,))
-    dec_x, dec_len = torch.randint(102, (8, 11)), torch.randint(1, 10, (8,))
+    enc_x, enc_len = torch.randint(101, (32, 10)), torch.randint(1, 10, (32,))
+    dec_x, dec_len = torch.randint(102, (32, 11)), torch.randint(1, 10, (32,))
     outs = seq2seq(enc_x, enc_len, dec_x, dec_len)
     print(outs.shape)
