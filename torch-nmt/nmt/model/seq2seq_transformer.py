@@ -23,7 +23,7 @@ class MultiHeadAttention(nn.Module):
         k = k.view(bs, -1, self.n_heads, self.h_hiddens).transpose(1, 2)
         v = v.view(bs, -1, self.n_heads, self.h_hiddens).transpose(1, 2)
         # q, k, v: (batch, head, srclen/tgtlen, h_hiddens)
-        e = torch.matmul(q, k.transpose(2, 3)) / self.scale
+        e = torch.matmul(q, k.transpose(2, 3)) / self.scale.to(q.device)
         # e: (batch, head, seqlen, seqlen)
         if mask is not None:
             e = e.masked_fill(mask == 0, -1e10)
@@ -72,7 +72,7 @@ class PositionEncoding(nn.Module):
         # x: (batch, srclen, embed)
         p = torch.arange(ls).unsqueeze(0).repeat(bs, 1)
         # p: (batch, seqlen)
-        return (x * self.scale) + self.pos_emb(p)
+        return (x * self.scale.to(x.device)) + self.pos_emb(p)
 
 class EncoderLayer(nn.Module):
     def __init__(self, n_heads, n_hiddens, ff_hiddens, dropout):
@@ -171,15 +171,17 @@ class TransformerSeq2Seq(nn.Module):
 
     def make_enc_mask(self, x, x_len):
         bs, ls = x.shape
-        m = torch.arange(ls).unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
+        m = torch.arange(ls).to(x.device)
+        m = m.unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
         # m: (batch, srclen)
         return m.unsqueeze(1).unsqueeze(2)
 
     def make_dec_mask(self, x, x_len):
         bs, ls = x.shape
-        m = torch.arange(ls).unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
+        m = torch.arange(ls).to(x.device)
+        m = m.unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
         # m: (batch, srclen)
-        s = torch.tril(torch.ones((ls, ls))).bool()
+        s = torch.tril(torch.ones((ls, ls)).bool()).to(x.device)
         return m.unsqueeze(1).unsqueeze(2) & s.unsqueeze(0)
 
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.0):
