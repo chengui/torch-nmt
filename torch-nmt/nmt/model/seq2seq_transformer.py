@@ -61,6 +61,19 @@ class AddNorm(nn.Module):
     def forward(self, x, y):
         return self.norm(x + self.dropout(y))
 
+class PositionEncoding(nn.Module):
+    def __init__(self, n_position, n_hiddens):
+        super().__init__()
+        self.pos_emb = nn.Embedding(n_position, n_hiddens)
+        self.scale = torch.sqrt(torch.FloatTensor([n_hiddens]))
+
+    def forward(self, x):
+        bs, ls, _ = x.shape
+        # x: (batch, srclen, embed)
+        p = torch.arange(ls).unsqueeze(0).repeat(bs, 1)
+        # p: (batch, seqlen)
+        return (x * self.scale) + self.pos_emb(p)
+
 class EncoderLayer(nn.Module):
     def __init__(self, n_heads, n_hiddens, ff_hiddens, dropout):
         super().__init__()
@@ -100,7 +113,7 @@ class TransformerEncoder(nn.Module):
                  n_position=100, dropout=0.1):
         super().__init__()
         self.tok_emb = nn.Embedding(n_vocab, n_hiddens)
-        self.pos_emb = nn.Embedding(n_position, n_hiddens)
+        self.pos_enc = PositionEncoding(n_position, n_hiddens)
         self.layers = nn.ModuleList([
             EncoderLayer(n_heads, n_hiddens, ff_hiddens, dropout)
             for _ in range(n_layers)])
@@ -109,8 +122,7 @@ class TransformerEncoder(nn.Module):
     def forward(self, x, mask):
         bs, ls = x.shape
         # x: (batch, srclen)
-        p = torch.arange(ls).unsqueeze(0).repeat(bs, 1)
-        x = self.dropout(self.pos_emb(p) + self.tok_emb(x))
+        x = self.dropout(self.pos_enc(self.tok_emb(x)))
         # x: (batch, srclen, hidden)
         for layer in self.layers:
             x = layer(x, mask)
@@ -122,22 +134,21 @@ class TransformerDecoder(nn.Module):
                  n_position=100, dropout=0.1):
         super().__init__()
         self.tok_emb = nn.Embedding(n_vocab, n_hiddens)
-        self.pos_emb = nn.Embedding(n_position, n_hiddens)
+        self.pos_enc = PositionEncoding(n_position, n_hiddens)
         self.layers = nn.ModuleList([
             DecoderLayer(n_heads, n_hiddens, ff_hiddens, dropout)
             for _ in range(n_layers)])
-        self.dense = nn.Linear(n_hiddens, n_vocab)
+        self.out = nn.Linear(n_hiddens, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, enc_x, mask, enc_mask):
-        bs, ls = x.shape
-        # x: (batch, srclen)
-        p = torch.arange(ls).unsqueeze(0).repeat(bs, 1)
-        x = self.dropout(self.pos_emb(p) + self.tok_emb(x))
-        # x: (batch, srclen, embed)
+    def forward(self, y, enc_x, mask, enc_mask):
+        bs, ls = y.shape
+        # y: (batch, srclen)
+        y = self.dropout(self.pos_enc(self.tok_emb(y)))
+        # y: (batch, srclen, embed)
         for layer in self.layers:
-            x = layer(x, enc_x, mask, enc_mask)
-        o = self.dense(x)
+            y = layer(y, enc_x, mask, enc_mask)
+        o = self.out(y)
         return o
 
 class TransformerSeq2Seq(nn.Module):
