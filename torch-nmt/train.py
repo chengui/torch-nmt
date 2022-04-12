@@ -11,12 +11,12 @@ from nmt.model import (
 )
 
 
-def valid_epoch(model, data_iter, criterion):
+def valid_epoch(model, data_iter, criterion, device):
     model.eval()
     with torch.no_grad():
         valid_loss = 0
         for idx, batch in enumerate(data_iter):
-            src, src_len, tgt, tgt_len = batch
+            src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
             tgt, gold = tgt[:, :-1], tgt[:, 1:]
             pred = model(src, src_len, tgt, tgt_len)
             # pred: (batch, seqlen, vocab)
@@ -27,11 +27,11 @@ def valid_epoch(model, data_iter, criterion):
         valid_loss /= len(data_iter)
         return valid_loss
 
-def train_epoch(model, data_iter, criterion, optimizer):
+def train_epoch(model, data_iter, criterion, optimizer, device):
     model.train()
     train_loss = 0
     for idx, batch in enumerate(data_iter):
-        src, src_len, tgt, tgt_len = batch
+        src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
         tgt, gold = tgt[:, :-1], tgt[:, 1:]
         optimizer.zero_grad()
         pred = model(src, src_len, tgt, tgt_len)
@@ -47,8 +47,8 @@ def train_epoch(model, data_iter, criterion, optimizer):
     train_loss /= len(data_iter)
     return train_loss
 
-def train(model, train_set, valid_set, src_vocab, tgt_vocab, work_dir=None,
-          num_epochs=10, batch_size=32, learning_rate=0.001):
+def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
+          work_dir=None, num_epochs=10, batch_size=32, learning_rate=0.001):
     train_iter = DataLoader(dataset=train_set,
                             batch_size=batch_size,
                             shuffle=True)
@@ -61,8 +61,8 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, work_dir=None,
 
     train_hist, valid_hist = [], []
     for epoch in range(num_epochs):
-        train_loss = train_epoch(model, train_iter, criterion, optimizer)
-        valid_loss = valid_epoch(model, valid_iter, criterion)
+        train_loss = train_epoch(model, train_iter, criterion, optimizer, device)
+        valid_loss = valid_epoch(model, valid_iter, criterion, device)
 
         train_hist.append(train_loss)
         valid_hist.append(valid_loss)
@@ -74,6 +74,13 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, work_dir=None,
 
         print(f'epoch {epoch+1}: train_loss={train_loss:>3f}, '
               f'valid_loss={valid_loss:>3f}')
+
+def get_device(cpu_only=False):
+    has_gpu = torch.cuda.is_available()
+    if cpu_only or not has_gpu:
+        return torch.device('cpu')
+    else:
+        return torch.device('cuda')
 
 
 if __name__ == '__main__':
@@ -90,6 +97,8 @@ if __name__ == '__main__':
                         help='batch size of mini-batch')
     parser.add_argument('-l', '--learning-rate', type=float, default=0.001,
                         help='learning rate of training')
+    parser.add_argument('--cpu-only', action='store_true',
+                        help='whether work on cpu only')
     parser.add_argument('--checkpoint', action='store_true',
                         help='whether use checkpoint in working dir')
     args = parser.parse_args()
@@ -98,14 +107,17 @@ if __name__ == '__main__':
     train_set, valid_set = create_dataset(args.work_dir,
                                           vocab=(src_vocab, tgt_vocab),
                                           split=('train', 'valid'))
+    device = get_device(args.cpu_only)
     model = create_model(model_type=args.model_type,
                          enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab))
+    model = model.to(device)
 
     if args.checkpoint:
         load_ckpt(model, args.work_dir)
 
     train(model, train_set, valid_set, src_vocab, tgt_vocab,
+          device=device,
           work_dir=args.work_dir,
           num_epochs=args.num_epochs,
           batch_size=args.batch_size,
