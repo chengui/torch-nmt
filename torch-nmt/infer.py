@@ -53,7 +53,7 @@ if __name__ == '__main__':
                          enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab))
     model = model.to(device)
-    load_ckpt(model, args.work_dir, mode='best')
+    load_ckpt(args.work_dir, model, None, mode='best')
 
     with open(args.source_file, 'r') as f:
         sents = [l.strip().split(' ') for l in f]

@@ -80,7 +80,7 @@ if __name__ == '__main__':
                          dec_vocab=len(tgt_vocab))
     model = model.to(device)
 
-    load_ckpt(model, args.work_dir, mode='best')
+    load_ckpt(args.work_dir, model, None, mode='best')
     evaluate(model, test_set, tgt_vocab,
              device=device,
              batch_size=args.batch_size,

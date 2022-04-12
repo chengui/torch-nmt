@@ -51,7 +51,8 @@ def train_epoch(model, data_iter, criterion, optimizer, device):
     return train_loss
 
 def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
-          work_dir=None, num_epochs=10, batch_size=32, learning_rate=0.001):
+          work_dir=None, num_epochs=10, batch_size=32, learning_rate=0.001,
+          checkpoint=False):
     train_iter = DataLoader(dataset=train_set,
                             batch_size=batch_size,
                             shuffle=True)
@@ -62,6 +63,9 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.PAD_IDX)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+    if checkpoint:
+        load_ckpt(work_dir, model, optimizer)
+
     train_hist, valid_hist = [], []
     for epoch in range(num_epochs):
         train_loss = train_epoch(model, train_iter, criterion, optimizer, device)
@@ -71,9 +75,9 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
         valid_hist.append(valid_loss)
 
         if work_dir is not None:
-            save_ckpt(work_dir, model, mode='last')
+            save_ckpt(work_dir, model, optimizer, mode='last')
         if valid_loss <= min(valid_hist):
-            save_ckpt(work_dir, model, mode='best')
+            save_ckpt(work_dir, model, optimizer, mode='best')
 
         print(f'epoch {epoch+1}: train_loss={train_loss:>3f}, '
               f'valid_loss={valid_loss:>3f}')
@@ -109,12 +113,10 @@ if __name__ == '__main__':
                          dec_vocab=len(tgt_vocab))
     model = model.to(device)
 
-    if args.checkpoint:
-        load_ckpt(model, args.work_dir)
-
     train(model, train_set, valid_set, src_vocab, tgt_vocab,
           device=device,
           work_dir=args.work_dir,
           num_epochs=args.num_epochs,
           batch_size=args.batch_size,
-          learning_rate=args.learning_rate)
+          learning_rate=args.learning_rate,
+          checkpoint=args.checkpoint)

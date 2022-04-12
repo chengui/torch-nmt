@@ -25,7 +25,7 @@ def create_model(model_type, enc_vocab, dec_vocab, **kw):
     seq2seq.apply(init_weights)
     return seq2seq
 
-def load_ckpt(model, work_dir, mode='last'):
+def load_ckpt(work_dir, model, optimizer=None, mode='last'):
     model_dir = os.path.join(work_dir, 'model')
     if not os.path.exists(model_dir):
         raise OSError(f'model dir not exits: {work_dir}')
@@ -33,14 +33,17 @@ def load_ckpt(model, work_dir, mode='last'):
     if not os.path.exists(model_file):
         raise OSError(f'checkpoint not exists: {work_dir}')
     checkpoint = torch.load(model_file)
-    model.load_state_dict(checkpoint['state_dict'])
+    model.load_state_dict(checkpoint['model'])
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint['optim'])
 
-def save_ckpt(work_dir, model, mode='last'):
+def save_ckpt(work_dir, model, optimizer, mode='last'):
     model_dir = os.path.join(work_dir, 'model')
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
     model_file = os.path.join(model_dir, f'checkpoint-{mode}.pt')
     checkpoint = {
-        'state_dict': model.state_dict(),
+        'model': model.state_dict(),
+        'optim': optimizer.state_dict(),
     }
     torch.save(checkpoint, model_file)
