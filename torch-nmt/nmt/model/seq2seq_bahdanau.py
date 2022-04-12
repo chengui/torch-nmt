@@ -126,7 +126,8 @@ class BahdanauSeq2Seq(nn.Module):
     def make_enc_mask(self, x, x_len):
         # x: (batch, seqlen)
         bs, ls = x.shape
-        m = torch.arange(ls).unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
+        m = torch.arange(ls).to(x.device)
+        m = m.unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
         # m: (batch, 1, seqlen)
         return m.unsqueeze(1)
 

@@ -45,9 +45,7 @@ class LuongAttention(nn.Module):
         # cat: (batch, seqlen, hiddens*2)
         w = torch.tanh(self.w_a(cat))
         # w: (batch, seqlen, hiddens)
-        return torch.sum(self.v_a*w, dim=-1).unsqueeze(1)
-        #v_a = torch.ones(q.shape[0], 1, q.shape[2]) * self.v_a
-        #return torch.bmm(v_a, w.permute(0, 2, 1))
+        return torch.sum(self.v_a.to(w.device)*w, dim=-1).unsqueeze(1)
 
 class LuongEncoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
@@ -139,7 +137,8 @@ class LuongSeq2Seq(nn.Module):
     def make_enc_mask(self, x, x_len):
         # x: (batch, seqlen)
         bs, ls = x.shape
-        m = torch.arange(ls).unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
+        m = torch.arange(ls).to(x.device)
+        m = m.unsqueeze(0).repeat(bs, 1).lt(x_len.unsqueeze(1))
         # m: (batch, 1, seqlen)
         return m.unsqueeze(1)
 
