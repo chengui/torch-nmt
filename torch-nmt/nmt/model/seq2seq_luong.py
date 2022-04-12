@@ -13,41 +13,41 @@ class LuongAttention(nn.Module):
         super().__init__()
         self.score_fn = score_fn
         if score_fn == 'general':
-            self.w = nn.Linear(n_hiddens, n_hiddens)
+            self.w_a = nn.Linear(n_hiddens, n_hiddens)
         elif score_fn == 'concat':
-            self.w = nn.Linear(n_hiddens*2, n_hiddens)
-            self.v = torch.FloatTensor(n_hiddens)
+            self.w_a = nn.Linear(n_hiddens*2, n_hiddens)
+            self.v_a = torch.FloatTensor(n_hiddens)
 
     def forward(self, q, k, v, mask=None):
-        # q: (batch, 1, hiddens)
+        # q: (batch, hiddens)
         # k: (batch, seqlen, hiddens)
         # v: (batch, seqlen, hiddens)
-        if self.score_fn == 'dot':
-            a = self.dot(q, k)
-        elif self.score_fn == 'general':
-            a = self.general(q, k)
-        elif self.score_fn == 'concat':
-            a = self.concat(q, k)
-        # a: (batch, 1, seqlen)
-        w = a.unsqueeze(1)
+        e = getattr(self, self.score_fn)(q, k)
+        # e: (batch, 1, seqlen)
         if mask is not None:
-            w = F.softmax(w.masked_fill(mask==0, -1e10), dim=-1)
-        c = torch.bmm(w, v)
+            e = e.masked_fill(mask==0, -1e10)
+        a = F.softmax(e, dim=-1)
+        # a: (batch, 1, seqlen)
+        c = torch.bmm(a, v)
         # c: (batch, 1, hiddens)
         return c
 
     def dot(self, q, k):
-        return torch.sum(q*k, dim=-1)
+        return torch.bmm(q.unsqueeze(1), k.permute(0, 2, 1))
 
     def general(self, q, k):
-        e = self.w(k)
-        return torch.sum(q*e, dim=-1)
+        e = self.w_a(q.unsqueeze(1))
+        return torch.bmm(e, k.permute(0, 2, 1))
 
     def concat(self, q, k):
-        q = q.repeat(1, k.shape[1], 1)
-        e = torch.cat([q, k], dim=-1)
-        w = torch.tanh(self.w(e))
-        return torch.sum(self.v * w, dim=-1)
+        q = q.unsqueeze(1).repeat(1, k.shape[1], 1)
+        cat = torch.cat([q, k], dim=-1)
+        # cat: (batch, seqlen, hiddens*2)
+        w = torch.tanh(self.w_a(cat))
+        # w: (batch, seqlen, hiddens)
+        return torch.sum(self.v_a*w, dim=-1).unsqueeze(1)
+        #v_a = torch.ones(q.shape[0], 1, q.shape[2]) * self.v_a
+        #return torch.bmm(v_a, w.permute(0, 2, 1))
 
 class LuongEncoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
@@ -74,8 +74,8 @@ class LuongEncoder(nn.Module):
         # h: (layers*dir, batch, hiddens)
         if self.use_birnn:
             # h: (layers*2, batch, hiddens)
-            _, batch_size, n_hiddens = h.shape
-            h = h.view(-1, 2, batch_size, n_hiddens)
+            _, bs, nh = h.shape
+            h = h.view(-1, 2, bs, nh)
             # h: (layers, 2, batch, hiddens)
             h = torch.stack([torch.cat((i[0], i[1]), dim=1) for i in h])
         # h: (layers, batch, hiddens*dir)
@@ -83,7 +83,7 @@ class LuongEncoder(nn.Module):
 
 class LuongDecoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1,
-                 use_birnn=False):
+                 score_fn='dot', use_birnn=False):
         super().__init__()
         if use_birnn: n_hiddens *= 2
         self.emb = nn.Embedding(n_vocab, n_embed)
@@ -91,24 +91,33 @@ class LuongDecoder(nn.Module):
                           num_layers=n_layers,
                           batch_first=True,
                           dropout=dropout)
-        self.attn = LuongAttention(n_hiddens)
-        self.dense = nn.Linear(n_embed+n_hiddens*2, n_vocab)
+        self.att = LuongAttention(n_hiddens, score_fn)
+        self.out = nn.Linear(n_hiddens*2, n_vocab)
+        ## self.out = nn.Linear(n_embed+n_hiddens*2, n_vocab)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, state, mask):
-        # x: (batch, seqlen)
-        enc_outs, hidden = state
-        # enc_outs: (batch, seqlen, hiddens)
-        # hidden: (layers, batch, hiddens)
-        e = self.dropout(self.emb(x))
+    def forward(self, y, state, mask):
+        # y: (batch, seqlen)
+        ctx, s = state
+        # ctx: (batch, seqlen, hiddens)
+        # s: (layers, batch, hiddens)
+        e = self.dropout(self.emb(y))
         # e: (batch, seqlen, embed)
-        o, h = self.rnn(e, hidden)
+        o, s = self.rnn(e, s)
         # o: (batch, seqlen, hiddens)
-        # h: (layers, batch, hiddens)
-        c = self.attn(o, enc_outs, enc_outs, mask)
+        # s: (layers, batch, hiddens)
+        c = self.att(s[-1], ctx, ctx, mask)
         # c: (batch, 1, hiddens)
-        out = self.dense(torch.cat([e, c, o], dim=-1))
-        return out, (enc_outs, hidden)
+        ## cat = torch.cat([e, c, o], dim=-1)
+        # cat: (batch, 1, embed+hiddens*2)
+        ## o = self.out(cat)
+        # o: (batch, 1, vocab)
+        s_ = s[-1].unsqueeze(1)
+        cat = torch.cat([s_, c], dim=-1)
+        # cat: (batch, 1, hiddens*2)
+        o = self.out(cat)
+        # o: (batch, 1, vocab)
+        return o, (ctx, s)
 
 class LuongSeq2Seq(nn.Module):
     def __init__(self, enc_vocab, dec_vocab, **kw):
@@ -122,8 +131,9 @@ class LuongSeq2Seq(nn.Module):
         self.decoder = LuongDecoder(n_vocab=dec_vocab,
                                     n_embed=kw.get('dec_embed', 256),
                                     n_hiddens=kw.get('n_hiddens', 512),
-                                    use_birnn=kw.get('use_birnn', False),
                                     n_layers=kw.get('n_layers', 1),
+                                    score_fn=kw.get('score_fn', 'dot'),
+                                    use_birnn=kw.get('use_birnn', False),
                                     dropout=kw.get('dropout', 0.0))
 
     def make_enc_mask(self, x, x_len):
@@ -136,7 +146,7 @@ class LuongSeq2Seq(nn.Module):
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
-        mask = self.make_enc_mask(enc_x, enc_len)
+        enc_mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_len)
         pred, outs = None, []
         for t in range(dec_x.shape[1]):
@@ -145,7 +155,7 @@ class LuongSeq2Seq(nn.Module):
             else:
                 x = pred
             # x: (batch,)
-            out, state = self.decoder(x.unsqueeze(-1), state, mask)
+            out, state = self.decoder(x.unsqueeze(-1), state, enc_mask)
             outs.append(out)
             # out: (batch, 1, vocab)
             pred = out.argmax(2).squeeze(1)
