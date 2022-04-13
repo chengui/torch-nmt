@@ -78,14 +78,15 @@ class RNNSeq2Seq(nn.Module):
             x = dec_x[:, 0]
             for t in range(dec_x.shape[1]):
                 if pred is None or (random.random() < teacher_ratio):
-                    x = dec_x[:, t]
+                    x = dec_x[:, t].unsqueeze(-1)
                 else:
                     x = pred
-                # x: (batch,)
-                out, hidden = self.decoder(x.unsqueeze(1), hidden)
-                # out: (batch, 1, dec_vocab)
-                pred = out.argmax(2).squeeze(1)
+                # x: (batch, 1)
+                out, hidden = self.decoder(x, hidden)
                 outs.append(out)
+                # out: (batch, 1, dec_vocab)
+                pred = out.argmax(2)
+                # pred: (batch, 1)
             outs = torch.cat(outs, dim=1)
         # outs: (batch, seqlen, dec_vocab)
         return outs

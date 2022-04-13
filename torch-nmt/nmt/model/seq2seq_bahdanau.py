@@ -145,16 +145,17 @@ class BahdanauSeq2Seq(nn.Module):
             pred, outs = None, []
             for t in range(dec_x.shape[1]):
                 if pred is None or (random.random() < teacher_ratio):
-                    x = dec_x[:, t]
+                    x = dec_x[:, t].unsqueeze(-1)
                 else:
                     x = pred
-                # x: (batch,)
-                out, state = self.decoder(x.unsqueeze(-1), state, enc_mask)
+                # x: (batch, 1)
+                out, state = self.decoder(x, state, enc_mask)
                 outs.append(out)
-                # out: (batch, 1, vocab)
-                pred = out.argmax(2).squeeze(1)
-                # pred: (batch,)
+                # out: (batch, 1, dec_vocab)
+                pred = out.argmax(2)
+                # pred: (batch, 1)
             outs = torch.cat(outs, dim=1)
+        # outs: (batch, seqlen, dec_vocab)
         return outs
 
 if __name__ == '__main__':
