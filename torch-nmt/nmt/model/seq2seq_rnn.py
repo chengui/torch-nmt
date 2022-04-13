@@ -27,7 +27,7 @@ class RNNEncoder(nn.Module):
         o, _ = pad_packed_sequence(o, batch_first=True)
         # o: (batch, seqlen, hiddens)
         # h: (layers, batch, hiddens)
-        return o, h
+        return h
 
 class RNNDecoder(nn.Module):
     def __init__(self, n_vocab, n_embed, n_hiddens, n_layers, dropout=0.1):
@@ -69,11 +69,11 @@ class RNNSeq2Seq(nn.Module):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
         if teacher_ratio >= 1:
-            _, hidden = self.encoder(enc_x, enc_len)
-            outs, _ = self.decoder(dec_x, hidden)
+            state = self.encoder(enc_x, enc_len)
+            outs, _ = self.decoder(dec_x, state)
         else:
-            _, hidden = self.encoder(enc_x, enc_len)
-            # hidden: (layers, batch, hiddens)
+            state = self.encoder(enc_x, enc_len)
+            # state: (layers, batch, hiddens)
             outs, pred = [], None
             x = dec_x[:, 0]
             for t in range(dec_x.shape[1]):
@@ -82,7 +82,7 @@ class RNNSeq2Seq(nn.Module):
                 else:
                     x = pred
                 # x: (batch, 1)
-                out, hidden = self.decoder(x, hidden)
+                out, state = self.decoder(x, state)
                 outs.append(out)
                 # out: (batch, 1, dec_vocab)
                 pred = out.argmax(2)
