@@ -146,21 +146,27 @@ class LuongSeq2Seq(nn.Module):
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
-        enc_mask = self.make_enc_mask(enc_x, enc_len)
-        state = self.encoder(enc_x, enc_len)
-        pred, outs = None, []
-        for t in range(dec_x.shape[1]):
-            if pred is None or (random.random() < teacher_ratio):
-                x = dec_x[:, t]
-            else:
-                x = pred
-            # x: (batch,)
-            out, state = self.decoder(x.unsqueeze(-1), state, enc_mask)
-            outs.append(out)
-            # out: (batch, 1, vocab)
-            pred = out.argmax(2).squeeze(1)
-            # pred: (batch,)
-        return torch.cat(outs, dim=1)
+        if teacher_ratio >= 1:
+            enc_mask = self.make_enc_mask(enc_x, enc_len)
+            state = self.encoder(enc_x, enc_len)
+            outs, _ = self.decoder(dec_x, state, enc_mask)
+        else:
+            enc_mask = self.make_enc_mask(enc_x, enc_len)
+            state = self.encoder(enc_x, enc_len)
+            pred, outs = None, []
+            for t in range(dec_x.shape[1]):
+                if pred is None or (random.random() < teacher_ratio):
+                    x = dec_x[:, t]
+                else:
+                    x = pred
+                # x: (batch,)
+                out, state = self.decoder(x.unsqueeze(-1), state, enc_mask)
+                outs.append(out)
+                # out: (batch, 1, vocab)
+                pred = out.argmax(2).squeeze(1)
+                # pred: (batch,)
+            outs = torch.cat(outs, dim=1)
+        return outs
 
 if __name__ == '__main__':
     seq2seq = LuongSeq2Seq(101, 102, n_layers=2, use_birnn=True)

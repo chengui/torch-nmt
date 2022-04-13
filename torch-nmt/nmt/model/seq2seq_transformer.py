@@ -189,30 +189,34 @@ class TransformerSeq2Seq(nn.Module):
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=1.0):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
-        enc_mask = self.make_enc_mask(enc_x, enc_len)
-        # enc_mask: (batch, 1, 1, srclen)
         if teacher_ratio >= 1:
+            enc_mask = self.make_enc_mask(enc_x, enc_len)
             dec_mask = self.make_dec_mask(dec_x, dec_len)
+            # enc_mask: (batch, 1, 1, srclen)
             # dec_mask: (batch, 1, tgtlen, tgtlen)
-            enc_o = self.encoder(enc_x, enc_mask)
+            state = self.encoder(enc_x, enc_mask)
             # enc_o: (batch, seqlen, hidden)
-            out = self.decoder(dec_x, enc_o, dec_mask, enc_mask)
+            outs = self.decoder(dec_x, state, dec_mask, enc_mask)
         else:
             bs, ls = dec_x.shape
-            enc_o = self.encoder(enc_x, enc_mask)
+            enc_mask = self.make_enc_mask(enc_x, enc_len)
+            # enc_mask: (batch, 1, 1, srclen)
+            state = self.encoder(enc_x, enc_mask)
             # enc_o: (batch, seqlen, hidden)
-            x = torch.LongTensor([[]]).to(dec_x.device).repeat(bs)
-            out, pred = None, None
+            x_t, pred = [], None
             for t in range(ls):
                 if pred is None or (random.random() < teacher_ratio):
-                    x = torch.cat([x, dec_x[:,t].unsqueeze(1)], dim=-1)
+                    x_t.append(dec_x[:, t].unsqueeze(1))
                 else:
-                    x = torch.cat([x, pred[:,-1].unsqueeze(1)], dim=-1)
-                x_len = torch.LongTensor([t+1]).to(x.device).repeat(bs)
+                    x_t.append(pred[:, -1].unsqueeze(1))
+                x = torch.cat(x_t, dim=-1).to(dec_x.device)
+                x_len = (t+1) * torch.ones(bs).long().to(x.device)
                 dec_mask = self.make_dec_mask(x, x_len)
-                out = self.decoder(x, enc_o, dec_mask, enc_mask)
-                pred = out.argmax(2)
-        return out
+                outs = self.decoder(x, state, dec_mask, enc_mask)
+                # outs: (batch, outlen, vocab)
+                pred = outs.argmax(2)
+                # pred: (batch, outlen)
+        return outs
 
 if __name__ == '__main__':
     seq2seq = TransformerSeq2Seq(101, 102, n_layers=2, n_heads=4)

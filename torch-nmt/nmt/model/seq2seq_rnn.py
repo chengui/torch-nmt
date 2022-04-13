@@ -68,22 +68,27 @@ class RNNSeq2Seq(nn.Module):
     def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.5):
         # enc_x: (batch, seqlen), enc_len: (batch,)
         # dec_x: (batch, seqlen), dec_len: (batch,)
-        _, hidden = self.encoder(enc_x, enc_len)
-        # hidden: (layers, batch, hiddens)
-        outs, pred = [], None
-        x = dec_x[:, 0]
-        for t in range(dec_x.shape[1]):
-            if pred is None or (random.random() < teacher_ratio):
-                x = dec_x[:, t]
-            else:
-                x = pred
-            # x: (batch,)
-            out, hidden = self.decoder(x.unsqueeze(1), hidden)
-            # out: (batch, 1, dec_vocab)
-            pred = out.argmax(2).squeeze(1)
-            outs.append(out)
-        # out: (batch, seqlen, dec_vocab)
-        return torch.cat(outs, dim=1)
+        if teacher_ratio >= 1:
+            _, hidden = self.encoder(enc_x, enc_len)
+            outs, _ = self.decoder(dec_x, hidden)
+        else:
+            _, hidden = self.encoder(enc_x, enc_len)
+            # hidden: (layers, batch, hiddens)
+            outs, pred = [], None
+            x = dec_x[:, 0]
+            for t in range(dec_x.shape[1]):
+                if pred is None or (random.random() < teacher_ratio):
+                    x = dec_x[:, t]
+                else:
+                    x = pred
+                # x: (batch,)
+                out, hidden = self.decoder(x.unsqueeze(1), hidden)
+                # out: (batch, 1, dec_vocab)
+                pred = out.argmax(2).squeeze(1)
+                outs.append(out)
+            outs = torch.cat(outs, dim=1)
+        # outs: (batch, seqlen, dec_vocab)
+        return outs
 
 if __name__ == '__main__':
     seq2seq = RNNSeq2Seq(101, 102, n_layers=2)
