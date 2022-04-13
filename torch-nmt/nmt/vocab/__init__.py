@@ -1,5 +1,4 @@
 import os
-import torch
 from nmt.vocab.vocab import Vocab
 
 
@@ -37,8 +36,6 @@ def batch_toindex(tokens, vocab):
     return tokens
 
 def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
-    if isinstance(indics, torch.Tensor):
-        indics = indics.tolist()
     filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
     batch = []
     for sent in indics:

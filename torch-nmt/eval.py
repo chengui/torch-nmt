@@ -39,9 +39,9 @@ def evaluate_bleu(model, data_iter, vocab, device, maxlen):
         tgt, gold = tgt[:, :-1], tgt[:, 1:]
         sos, sos_len = init_target(src.shape[0], src_vocab, maxlen)
         sos, sos_len = sos.to(device), sos_len.to(device)
-        pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
-        cnd_seq.extend(batch_totoken(pred.argmax(2), vocab))
-        ref_seq.extend(batch_totoken(gold, vocab, unsqueeze=True))
+        out = model(src, src_len, sos, sos_len, teacher_ratio=0)
+        cnd_seq.extend(batch_totoken(out.argmax(2).tolist(), vocab))
+        ref_seq.extend(batch_totoken(gold.tolist(), vocab, unsqueeze=True))
     return bleu_score(cnd_seq, ref_seq)
 
 def evaluate(model, dataset, vocab, device=None, batch_size=32, max_length=10):

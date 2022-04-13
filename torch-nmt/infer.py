@@ -19,13 +19,11 @@ def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None,
     model.eval()
     pred_seq = []
     for _, sent in enumerate(sents):
-        src, src_len = numerical([sent], src_vocab, maxlen=maxlen)
-        src, src_len = src.to(device), src_len.to(device)
-        sos, sos_len = init_target(src.shape[0], src_vocab, maxlen)
-        sos, sos_len = sos.to(device), sos_len.to(device)
-        pred = model(src, src_len, sos, sos_len, teacher_ratio=0)
-        tokens = batch_totoken(pred.argmax(2), tgt_vocab, strip_eos=True)
-        pred_seq.extend(tokens)
+        src, src_len = numerical([sent], src_vocab, maxlen, device)
+        sos, sos_len = init_target(src.shape[0], src_vocab, maxlen, device)
+        out = model(src, src_len, sos, sos_len, teacher_ratio=0)
+        pred = out.argmax(2).tolist()
+        pred_seq.extend(batch_totoken(pred, tgt_vocab, strip_eos=True))
     with open(pred_file, 'w', encoding='utf-8') as wf:
         for (sent, pred) in zip(sents, pred_seq):
             wf.write(' '.join(sent) + '\t' + ' '.join(pred) + '\n')
