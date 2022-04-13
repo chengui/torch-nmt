@@ -218,6 +218,31 @@ class TransformerSeq2Seq(nn.Module):
                 # pred: (batch, outlen)
         return outs
 
+    def predict(self, enc_x, enc_len, dec_x, dec_len, eos_idx=3, maxlen=100):
+        bs, dev = dec_x.shape[0], dec_x.device
+        enc_mask = self.make_enc_mask(enc_x, enc_len)
+        state = self.encoder(enc_x, enc_mask)
+        # state: (layers, batch, hiddens)
+        x_t, pred = [], None
+        pred_len = maxlen * torch.ones(bs).long().to(dev)
+        # pred_lens: (batch,)
+        for t in range(maxlen):
+            if pred is None:
+                x_t.append(dec_x[:, t])
+            else:
+                x_t.append(pred[:, -1])
+            x = torch.stack(x_t, dim=-1).to(dev)
+            x_len = (t+1) * torch.ones(bs).long().to(dev)
+            dec_mask = self.make_dec_mask(x, x_len)
+            outs = self.decoder(x, state, dec_mask, enc_mask)
+            # outs: (batch, 1, dec_vocab)
+            pred = outs.argmax(2)
+            # pred: (batch, 1)
+            indics = pred_len.gt(t) & pred[:,-1].eq(eos_idx)
+            pred_len[indics] = t
+        return pred, pred_len
+
+
 if __name__ == '__main__':
     seq2seq = TransformerSeq2Seq(101, 102, n_layers=2, n_heads=4)
     enc_x, enc_len = torch.randint(101, (8, 10)), torch.randint(1, 10, (8,))
