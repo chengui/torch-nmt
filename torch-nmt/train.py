@@ -2,6 +2,7 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from nmt.dataset import create_dataset
+from nmt.optim import NoamScheduler
 from nmt.vocab import load_vocab
 from nmt.util import (
     clip_grad,
@@ -30,7 +31,7 @@ def valid_epoch(model, data_iter, criterion, device):
         valid_loss /= len(data_iter)
         return valid_loss
 
-def train_epoch(model, data_iter, criterion, optimizer, device):
+def train_epoch(model, data_iter, criterion, optimizer, scheduler, device):
     model.train()
     train_loss = 0
     for idx, batch in enumerate(data_iter):
@@ -48,11 +49,12 @@ def train_epoch(model, data_iter, criterion, optimizer, device):
         optimizer.step()
         train_loss += loss.item()
     train_loss /= len(data_iter)
+    scheduler.step()
     return train_loss
 
 def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
           work_dir=None, num_epochs=10, batch_size=32, learning_rate=0.001,
-          checkpoint=False):
+          warmup_steps=400, checkpoint=False):
     train_iter = DataLoader(dataset=train_set,
                             batch_size=batch_size,
                             shuffle=True)
@@ -61,14 +63,17 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
                             shuffle=False)
 
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.PAD_IDX)
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate,
+                           betas=(0.9, 0.98), eps=1e-9)
+    scheduler = NoamScheduler(optimizer, warmup_steps)
 
     if checkpoint:
         load_ckpt(work_dir, model, optimizer)
 
     train_hist, valid_hist = [], []
     for epoch in range(num_epochs):
-        train_loss = train_epoch(model, train_iter, criterion, optimizer, device)
+        train_loss = train_epoch(model, train_iter, criterion, optimizer,
+                                 scheduler, device)
         valid_loss = valid_epoch(model, valid_iter, criterion, device)
 
         train_hist.append(train_loss)
@@ -97,6 +102,8 @@ if __name__ == '__main__':
                         help='batch size of mini-batch')
     parser.add_argument('-l', '--learning-rate', type=float, default=0.001,
                         help='learning rate of training')
+    parser.add_argument('--warmup-steps', type=int, default=400,
+                        help='warmup steps of training')
     parser.add_argument('--cpu-only', action='store_true',
                         help='whether work on cpu only')
     parser.add_argument('--checkpoint', action='store_true',
@@ -119,4 +126,5 @@ if __name__ == '__main__':
           num_epochs=args.num_epochs,
           batch_size=args.batch_size,
           learning_rate=args.learning_rate,
+          warmup_steps=args.warmup_steps,
           checkpoint=args.checkpoint)
