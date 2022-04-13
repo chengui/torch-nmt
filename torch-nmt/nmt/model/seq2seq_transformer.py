@@ -1,4 +1,5 @@
 import math
+import random
 import torch
 from torch import nn
 
@@ -185,14 +186,32 @@ class TransformerSeq2Seq(nn.Module):
         s = torch.tril(torch.ones((ls, ls)).bool()).to(x.device)
         return m.unsqueeze(1).unsqueeze(2) & s.unsqueeze(0)
 
-    def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=0.0):
+    def forward(self, enc_x, enc_len, dec_x, dec_len, teacher_ratio=1.0):
+        # enc_x: (batch, seqlen), enc_len: (batch,)
+        # dec_x: (batch, seqlen), dec_len: (batch,)
         enc_mask = self.make_enc_mask(enc_x, enc_len)
-        dec_mask = self.make_dec_mask(dec_x, dec_len)
         # enc_mask: (batch, 1, 1, srclen)
-        # dec_mask: (batch, 1, tgtlen, tgtlen)
-        enc_o = self.encoder(enc_x, enc_mask)
-        # enc_o: (batch, seqlen, hidden)
-        out = self.decoder(dec_x, enc_o, dec_mask, enc_mask)
+        if teacher_ratio >= 1:
+            dec_mask = self.make_dec_mask(dec_x, dec_len)
+            # dec_mask: (batch, 1, tgtlen, tgtlen)
+            enc_o = self.encoder(enc_x, enc_mask)
+            # enc_o: (batch, seqlen, hidden)
+            out = self.decoder(dec_x, enc_o, dec_mask, enc_mask)
+        else:
+            bs, ls = dec_x.shape
+            enc_o = self.encoder(enc_x, enc_mask)
+            # enc_o: (batch, seqlen, hidden)
+            x = torch.LongTensor([[]]).to(dec_x.device).repeat(bs)
+            out, pred = None, None
+            for t in range(ls):
+                if pred is None or (random.random() < teacher_ratio):
+                    x = torch.cat([x, dec_x[:,t].unsqueeze(1)], dim=-1)
+                else:
+                    x = torch.cat([x, pred[:,-1].unsqueeze(1)], dim=-1)
+                x_len = torch.LongTensor([t+1]).to(x.device).repeat(bs)
+                dec_mask = self.make_dec_mask(x, x_len)
+                out = self.decoder(x, enc_o, dec_mask, enc_mask)
+                pred = out.argmax(2)
         return out
 
 if __name__ == '__main__':
