@@ -15,20 +15,28 @@ from nmt.model import (
 )
 
 
-def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None,
-            maxlen=10):
+def predict(model, sents, src_vocab, tgt_vocab, device=None, beam=None,
+            pred_file=None, maxlen=10):
     model.eval()
     pred_seq = []
     eos_idx = tgt_vocab.EOS_IDX
     for _, sent in enumerate(sents):
         src, src_len = numerical([sent], src_vocab, maxlen, device)
         sos, sos_len = init_target(src.shape[0], src_vocab, maxlen, device)
-        pred, lens = model.predict(src, src_len, sos, sos_len, eos_idx, maxlen)
-        pred_lst = tolist(pred, lens)
-        pred_seq.extend(batch_totoken(pred_lst, tgt_vocab))
+        if not beam:
+            pred, lens = model.predict(src, src_len, sos, sos_len,
+                                       eos_idx=eos_idx, maxlen=maxlen)
+            pred_list = tolist(pred.unsqueeze(1), lens.unsqueeze(1))
+        else:
+            pred, lens = model.beam_predict(src, src_len, sos, sos_len,
+                                            beam=beam, eos_idx=eos_idx,
+                                            maxlen=maxlen)
+            pred_list = tolist(pred, lens)
+        pred_seq.extend(batch_totoken(pred_list, tgt_vocab))
     with open(pred_file, 'w', encoding='utf-8') as wf:
-        for (sent, pred) in zip(sents, pred_seq):
-            wf.write(' '.join(sent) + '\t' + ' '.join(pred) + '\n')
+        for (sent, preds) in zip(sents, pred_seq):
+            for pred in preds:
+                wf.write(' '.join(sent) + '\t' + ' '.join(pred) + '\n')
 
 
 if __name__ == '__main__':
@@ -43,6 +51,8 @@ if __name__ == '__main__':
                         help='source file with preprocessed data')
     parser.add_argument('-l', '--max-length', type=int, default=10,
                         help='maxium length to predict')
+    parser.add_argument('-b', '--beam-size', type=int, default=None,
+                        help='beam size used in beam search')
     parser.add_argument('--cpu-only', action='store_true',
                         help='whether work on cpu only')
     args = parser.parse_args()
@@ -64,5 +74,6 @@ if __name__ == '__main__':
     pred_file = os.path.join(out_dir, pred_name)
     predict(model, sents, src_vocab, tgt_vocab,
             device=device,
+            beam=args.beam_size,
             pred_file=pred_file,
             maxlen=args.max_length)
