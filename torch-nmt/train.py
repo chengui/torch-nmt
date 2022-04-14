@@ -102,7 +102,7 @@ if __name__ == '__main__':
                         help='batch size of mini-batch')
     parser.add_argument('-l', '--learning-rate', type=float, default=0.001,
                         help='learning rate of training')
-    parser.add_argument('--warmup-steps', type=int, default=400,
+    parser.add_argument('--warmup-steps', type=int, default=0,
                         help='warmup steps of training')
     parser.add_argument('--cpu-only', action='store_true',
                         help='whether work on cpu only')

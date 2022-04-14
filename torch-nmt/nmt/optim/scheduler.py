@@ -3,13 +3,13 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 class NoamScheduler(_LRScheduler):
-    def __init__(self, optimizer, warmup_steps, d_model=-1, **kw):
+    def __init__(self, optimizer, warmup_steps=0, d_model=-1, **kw):
         self.d_model = d_model
         self.warmup_steps = warmup_steps
         super().__init__(optimizer, **kw)
 
     def get_lr(self):
-        if self.last_epoch == 0:
+        if self.last_epoch == 0 or self.warmup_steps <= 0:
             return self.base_lrs
         if self.d_model <= 0:
             base_lrs = self.base_lrs
