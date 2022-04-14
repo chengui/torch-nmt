@@ -112,15 +112,16 @@ class RNNSeq2Seq(nn.Module):
             # pred: (batch, 1)
             if all(pred_lens.le(t)):
                 break
-            indics = pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)
-            pred_lens[indics] = t
+            pred_lens[pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)] = t
         return torch.cat(preds, dim=-1), pred_lens
 
     @torch.no_grad()
-    def beam_predict(self, enc_x, enc_len, dec_x, dec_len, beam=2, maxlen=100):
+    def beam_predict(self, enc_x, enc_len, dec_x, dec_len,
+                     beam=2, eos_idx=3, maxlen=100):
         state = self.encoder(enc_x, enc_len)
         # state: (layers, batch*beam, hiddens)
         pred = None
+        pred_lens = maxlen * torch.ones(dec_x.shape[0]*beam).long()
         for t in range(maxlen):
             if t == 0:
                 x = dec_x[:, t].unsqueeze(1)
@@ -136,8 +137,12 @@ class RNNSeq2Seq(nn.Module):
                 preds, scores = beam_search(out, preds, scores, beam)
             # preds: (batch, beam, t), scores: (batch, beam)
             pred = preds[:, :, -1]
-        # (batch, beam, seqlen)
-        return preds
+            # pred: (batch, beam)
+            if all(pred_lens.le(t)):
+                break
+            pred_lens[pred_lens.gt(t) & pred.view(-1).eq(eos_idx)] = t
+        # (batch, beam, seqlen), (batch, beam)
+        return preds, pred_lens.view(-1, beam)
 
 
 if __name__ == '__main__':
