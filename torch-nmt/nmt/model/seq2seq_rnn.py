@@ -5,7 +5,7 @@ from torch.nn.utils.rnn import (
     pack_padded_sequence,
     pad_packed_sequence
 )
-from .beam import (
+from .beam_decoder import (
     beam_initial,
     beam_search
 )
@@ -117,7 +117,7 @@ class RNNSeq2Seq(nn.Module):
         return torch.cat(preds, dim=-1), pred_lens
 
     @torch.no_grad()
-    def beam_predict(self, enc_x, enc_len, dec_x, dec_len, n_beam=2, maxlen=100):
+    def beam_predict(self, enc_x, enc_len, dec_x, dec_len, beam=2, maxlen=100):
         state = self.encoder(enc_x, enc_len)
         # state: (layers, batch*beam, hiddens)
         pred = None
@@ -130,10 +130,10 @@ class RNNSeq2Seq(nn.Module):
             out, state = self.decoder(x, state)
             # out: (batch*beam, 1, dec_vocab)
             if t == 0:
-                preds, scores = beam_initial(out, n_beam)
-                state = state.repeat(1, n_beam, 1)
+                preds, scores = beam_initial(out, beam)
+                state = state.repeat(1, beam, 1)
             else:
-                preds, scores = beam_search(out, preds, scores, n_beam)
+                preds, scores = beam_search(out, preds, scores, beam)
             # preds: (batch, beam, t), scores: (batch, beam)
             pred = preds[:, :, -1]
         # (batch, beam, seqlen)
