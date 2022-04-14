@@ -158,6 +158,25 @@ class BahdanauSeq2Seq(nn.Module):
         # outs: (batch, seqlen, dec_vocab)
         return outs
 
+    def predict(self, enc_x, enc_len, dec_x, dec_len, eos_idx=3, maxlen=100):
+        state = self.encoder(enc_x, enc_len)
+        # state: (layers, batch, hiddens)
+        preds, pred = [], None
+        pred_lens = maxlen * torch.ones(dec_x.shape[0]).long()
+        # pred_lens: (batch,)
+        for t in range(maxlen):
+            x = dec_x[:, t].unsqueeze(1) if pred is None else pred
+            # x: (batch, 1)
+            out, state = self.decoder(x, state)
+            # out: (batch, 1, dec_vocab)
+            pred = out.argmax(2)
+            preds.append(pred)
+            # pred: (batch, 1)
+            indics = pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)
+            pred_lens[indics] = t
+        return torch.cat(preds, dim=-1), pred_lens
+
+
 if __name__ == '__main__':
     seq2seq = BahdanauSeq2Seq(101, 102, n_layers=2, use_birnn=True)
     enc_x, enc_len = torch.randint(101, (32, 10)), torch.randint(1, 10, (32,))
