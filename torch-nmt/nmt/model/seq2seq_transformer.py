@@ -218,31 +218,32 @@ class TransformerSeq2Seq(nn.Module):
                 # pred: (batch, outlen)
         return outs
 
+    @torch.no_grad()
     def predict(self, enc_x, enc_len, dec_x, dec_len, eos_idx=3, maxlen=100):
         bs, dev = dec_x.shape[0], dec_x.device
         enc_mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_mask)
         # state: (layers, batch, hiddens)
-        x_t, pred = [], None
-        pred_len = maxlen * torch.ones(bs).long().to(dev)
+        x_t, preds = [], None
+        pred_lens = maxlen * torch.ones(bs).long().to(dev)
         # pred_lens: (batch,)
         for t in range(maxlen):
-            if pred is None:
+            if preds is None:
                 x_t.append(dec_x[:, t])
             else:
-                x_t.append(pred[:, -1])
+                x_t.append(preds[:, -1])
             x = torch.stack(x_t, dim=-1).to(dev)
             x_len = (t+1) * torch.ones(bs).long().to(dev)
+            # x: (batch, t), x_len: (batch,)
             dec_mask = self.make_dec_mask(x, x_len)
             outs = self.decoder(x, state, dec_mask, enc_mask)
-            # outs: (batch, 1, dec_vocab)
-            pred = outs.argmax(2)
-            # pred: (batch, 1)
-            if all(pred_len.le(t)):
+            # outs: (batch, t, dec_vocab)
+            preds = outs.argmax(2)
+            # preds: (batch, t)
+            if all(pred_lens.le(t)):
                 break
-            indics = pred_len.gt(t) & pred[:,-1].eq(eos_idx)
-            pred_len[indics] = t
-        return pred, pred_len
+            pred_lens[pred_lens.gt(t) & preds[:,-1].eq(eos_idx)] = t
+        return preds, pred_lens
 
 
 if __name__ == '__main__':

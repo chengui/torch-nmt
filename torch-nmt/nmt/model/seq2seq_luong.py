@@ -168,7 +168,9 @@ class LuongSeq2Seq(nn.Module):
             outs = torch.cat(outs, dim=1)
         return outs
 
+    @torch.no_grad()
     def predict(self, enc_x, enc_len, dec_x, dec_len, eos_idx=3, maxlen=100):
+        enc_mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_len)
         # state: (layers, batch, hiddens)
         preds, pred = [], None
@@ -177,15 +179,14 @@ class LuongSeq2Seq(nn.Module):
         for t in range(maxlen):
             x = dec_x[:, t].unsqueeze(1) if pred is None else pred
             # x: (batch, 1)
-            out, state = self.decoder(x, state)
-            # out: (batch, 1, dec_vocab)
+            out, state = self.decoder(x, state, enc_mask)
+            # out: (batch, 1, vocab)
             pred = out.argmax(2)
             preds.append(pred)
             # pred: (batch, 1)
             if all(pred_lens.le(t)):
                 break
-            indics = pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)
-            pred_lens[indics] = t
+            pred_lens[pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)] = t
         return torch.cat(preds, dim=-1), pred_lens
 
 
