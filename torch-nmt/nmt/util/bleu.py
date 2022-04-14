@@ -31,8 +31,6 @@ def bleu_score(cands, refss, max_n=4, weights=[0.25]*4, smooth=False):
         for n in range(max_n):
             total_counts[n] += max(0, len(cand)-n)
 
-    print(clipped_counts, total_counts)
-
     pn = [0] * max_n
     for n in range(max_n):
         if smooth:
