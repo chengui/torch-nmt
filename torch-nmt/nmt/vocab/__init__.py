@@ -35,13 +35,15 @@ def batch_toindex(tokens, vocab):
     tokens = [vocab[token] for token in tokens]
     return tokens
 
-def batch_totoken(indics, vocab, unsqueeze=False, padding_eos=False):
-    batch = []
-    for sent in indics:
+def batch_totoken(indics, vocab, padding_eos=False):
+    if not isinstance(indics, (tuple, list)):
+        indics = [indics]
+    if len(indics) and isinstance(indics[0], int):
         if padding_eos:
-            sent = sent + [vocab.EOS_IDX]
-        if unsqueeze:
-            batch.append([vocab.token(sent)])
-        else:
-            batch.append(vocab.token(sent))
-    return batch
+            indics = indics + [vocab.PAD_IDX]
+        return vocab.token(indics)
+    else:
+        batch = []
+        for indic in indics:
+            batch.append(batch_totoken(indic, vocab, padding_eos))
+        return batch

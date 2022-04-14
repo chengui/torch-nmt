@@ -13,10 +13,13 @@ def read_tsv(path):
 def tolist(x, x_len=None):
     if x_len is None:
         return x.tolist()
-    seq = []
-    for i in range(len(x_len)):
-        seq.append(x[i][:x_len[i]].tolist())
-    return seq
+    s = []
+    for i in range(x.shape[0]):
+        si = []
+        for j in range(x.shape[1]):
+            si.append(x[i,j,:x_len[i,j]].tolist())
+        s.append(si)
+    return s
 
 def pad(sent, maxlen, pad_idx):
     sent = sent + [pad_idx] * max(0, maxlen-len(sent))
