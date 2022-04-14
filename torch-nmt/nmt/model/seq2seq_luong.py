@@ -6,6 +6,10 @@ from torch.nn.utils.rnn import (
     pack_padded_sequence,
     pad_packed_sequence
 )
+from .beam_decoder import (
+    beam_initial,
+    beam_search
+)
 
 
 class LuongAttention(nn.Module):
@@ -166,6 +170,7 @@ class LuongSeq2Seq(nn.Module):
                 pred = out.argmax(2)
                 # pred: (batch, 1)
             outs = torch.cat(outs, dim=1)
+        # outs: (batch, seqlen, vocab)
         return outs
 
     @torch.no_grad()
@@ -188,6 +193,40 @@ class LuongSeq2Seq(nn.Module):
                 break
             pred_lens[pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)] = t
         return torch.cat(preds, dim=-1), pred_lens
+
+    @torch.no_grad()
+    def beam_predict(self, enc_x, enc_len, dec_x, dec_len,
+                     beam=2, eos_idx=3, maxlen=100):
+        enc_mask = self.make_enc_mask(enc_x, enc_len)
+        # enc_mask: (batch, 1, seqlen)
+        state = self.encoder(enc_x, enc_len)
+        # state: (layers, batch, hiddens)
+        pred = None
+        pred_lens = maxlen * torch.ones(dec_x.shape[0]*beam).long()
+        for t in range(maxlen):
+            if t == 0:
+                x = dec_x[:, t].unsqueeze(1)
+            else:
+                x = pred.view(-1, 1)
+            # x: (batch*beam, 1)
+            out, state = self.decoder(x, state, enc_mask)
+            # out: (batch*beam, 1, dec_vocab)
+            if t == 0:
+                preds, scores = beam_initial(out, beam)
+                state = state.repeat(1, beam, 1)
+                # state: (layers, batch*beam, hiddens)
+                enc_mask = enc_mask.repeat(beam, 1, 1)
+                # enc_mask: (batch*beam, 1, seqlen)
+            else:
+                preds, scores = beam_search(out, preds, scores, beam)
+            # preds: (batch, beam, t), scores: (batch, beam)
+            pred = preds[:, :, -1]
+            # pred: (batch, beam)
+            if all(pred_lens.le(t)):
+                break
+            pred_lens[pred_lens.gt(t) & pred.view(-1).eq(eos_idx)] = t
+        # (batch, beam, seqlen), (batch, beam)
+        return preds, pred_lens.view(-1, beam)
 
 
 if __name__ == '__main__':

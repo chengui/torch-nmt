@@ -119,7 +119,7 @@ class RNNSeq2Seq(nn.Module):
     def beam_predict(self, enc_x, enc_len, dec_x, dec_len,
                      beam=2, eos_idx=3, maxlen=100):
         state = self.encoder(enc_x, enc_len)
-        # state: (layers, batch*beam, hiddens)
+        # state: (layers, batch, hiddens)
         pred = None
         pred_lens = maxlen * torch.ones(dec_x.shape[0]*beam).long()
         for t in range(maxlen):
@@ -133,6 +133,7 @@ class RNNSeq2Seq(nn.Module):
             if t == 0:
                 preds, scores = beam_initial(out, beam)
                 state = state.repeat(1, beam, 1)
+                # state: (layers, batch*beam, hiddens)
             else:
                 preds, scores = beam_search(out, preds, scores, beam)
             # preds: (batch, beam, t), scores: (batch, beam)

@@ -2,6 +2,10 @@ import math
 import random
 import torch
 from torch import nn
+from .beam_decoder import (
+    beam_initial,
+    beam_search
+)
 
 
 class MultiHeadAttention(nn.Module):
@@ -223,7 +227,7 @@ class TransformerSeq2Seq(nn.Module):
         bs, dev = dec_x.shape[0], dec_x.device
         enc_mask = self.make_enc_mask(enc_x, enc_len)
         state = self.encoder(enc_x, enc_mask)
-        # state: (layers, batch, hiddens)
+        # state: (batch, seqlen, hiddens)
         x_t, preds = [], None
         pred_lens = maxlen * torch.ones(bs).long().to(dev)
         # pred_lens: (batch,)
@@ -244,6 +248,44 @@ class TransformerSeq2Seq(nn.Module):
                 break
             pred_lens[pred_lens.gt(t) & preds[:,-1].eq(eos_idx)] = t
         return preds, pred_lens
+
+    @torch.no_grad()
+    def beam_predict(self, enc_x, enc_len, dec_x, dec_len,
+                     beam=2, eos_idx=3, maxlen=100):
+        bs, dev = dec_x.shape[0], dec_x.device
+        enc_mask = self.make_enc_mask(enc_x, enc_len)
+        # enc_mask: (batch, 1, 1, seqlen)
+        state = self.encoder(enc_x, enc_len)
+        # state: (batch, seqlen, hiddens)
+        x_t, preds = [], None
+        pred_lens = maxlen * torch.ones(dec_x.shape[0]*beam).long()
+        for t in range(maxlen):
+            if t == 0:
+                x_t.append(dec_x[:, t])
+            else:
+                x_t.append(preds[:, -1])
+            x = torch.stack(x_t, dim=-1).to(dev)
+            x_len = (t+1) * torch.ones(bs).long().to(dev)
+            # x: (batch*beam, 1)
+            dec_mask = self.make_dec_mask(x, x_len)
+            out, state = self.decoder(x, state, dec_mask, enc_mask)
+            # out: (batch*beam, t, dec_vocab)
+            if t == 0:
+                preds, scores = beam_initial(out, beam)
+                state = state.repeat(beam, 1, 1)
+                # state: (batch*beam, seqlen, hiddens)
+                enc_mask = enc_mask.repeat(beam, 1, 1, 1)
+                # enc_mask: (batch*beam, 1, 1, seqlen)
+            else:
+                preds, scores = beam_search(out, preds, scores, beam)
+            # preds: (batch, beam, t), scores: (batch, beam)
+            pred = preds[:, :, -1]
+            # pred: (batch, beam)
+            if all(pred_lens.le(t)):
+                break
+            pred_lens[pred_lens.gt(t) & pred.view(-1).eq(eos_idx)] = t
+        # (batch, beam, seqlen), (batch, beam)
+        return preds, pred_lens.view(-1, beam)
 
 
 if __name__ == '__main__':
