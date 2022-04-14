@@ -3,19 +3,23 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 class NoamScheduler(_LRScheduler):
-    def __init__(self, optimizer, warmup_steps, d_model=512, **kw):
+    def __init__(self, optimizer, warmup_steps, d_model=-1, **kw):
         self.d_model = d_model
         self.warmup_steps = warmup_steps
         super().__init__(optimizer, **kw)
-        print(self.d_model, self.n_layers)
 
     def get_lr(self):
         if self.last_epoch == 0:
             return self.base_lrs
-        new_lr = np.power(self.d_model, -0.5) * np.min([
+        if self.d_model <= 0:
+            base_lrs = self.base_lrs
+        else:
+            new_base = np.power(self.d_model, -0.5)
+            base_lrs = [new_base] * len(self.base_lrs)
+        gamma = np.min([
             np.power(self.last_epoch, -0.5),
             np.power(self.warmup_steps, -1.5) * self.last_epoch])
-        return [new_lr for group in self.optimizer.param_groups]
+        return [lr * gamma for lr in base_lrs]
 
 
 if __name__ == '__main__':
