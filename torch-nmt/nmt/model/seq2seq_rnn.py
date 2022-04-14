@@ -5,6 +5,10 @@ from torch.nn.utils.rnn import (
     pack_padded_sequence,
     pad_packed_sequence
 )
+from .beam import (
+    beam_initial,
+    beam_search
+)
 
 
 class RNNEncoder(nn.Module):
@@ -91,6 +95,7 @@ class RNNSeq2Seq(nn.Module):
         # outs: (batch, seqlen, dec_vocab)
         return outs
 
+    @torch.no_grad()
     def predict(self, enc_x, enc_len, dec_x, dec_len, eos_idx=3, maxlen=100):
         state = self.encoder(enc_x, enc_len)
         # state: (layers, batch, hiddens)
@@ -110,6 +115,29 @@ class RNNSeq2Seq(nn.Module):
             indics = pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)
             pred_lens[indics] = t
         return torch.cat(preds, dim=-1), pred_lens
+
+    @torch.no_grad()
+    def beam_predict(self, enc_x, enc_len, dec_x, dec_len, n_beam=2, maxlen=100):
+        state = self.encoder(enc_x, enc_len)
+        # state: (layers, batch*beam, hiddens)
+        pred = None
+        for t in range(maxlen):
+            if t == 0:
+                x = dec_x[:, t].unsqueeze(1)
+            else:
+                x = pred.view(-1, 1)
+            # x: (batch*beam, 1)
+            out, state = self.decoder(x, state)
+            # out: (batch*beam, 1, dec_vocab)
+            if t == 0:
+                preds, scores = beam_initial(out, n_beam)
+                state = state.repeat(1, n_beam, 1)
+            else:
+                preds, scores = beam_search(out, preds, scores, n_beam)
+            # preds: (batch, beam, t), scores: (batch, beam)
+            pred = preds[:, :, -1]
+        # (batch, beam, seqlen)
+        return preds
 
 
 if __name__ == '__main__':
