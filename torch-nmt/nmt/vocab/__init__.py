@@ -35,14 +35,11 @@ def batch_toindex(tokens, vocab):
     tokens = [vocab[token] for token in tokens]
     return tokens
 
-def batch_totoken(indics, vocab, unsqueeze=False, strip_eos=False):
-    filtered = lambda i: i not in (vocab.PAD_IDX, vocab.SOS_IDX)
+def batch_totoken(indics, vocab, unsqueeze=False, padding_eos=False):
     batch = []
     for sent in indics:
-        sent = list(filter(filtered, sent))
-        if vocab.EOS_IDX in sent:
-            i = sent.index(vocab.EOS_IDX)
-            sent = sent[:i] if strip_eos else sent[:i+1]
+        if padding_eos:
+            sent = sent + [vocab.EOS_IDX]
         if unsqueeze:
             batch.append([vocab.token(sent)])
         else:

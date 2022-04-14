@@ -5,6 +5,7 @@ from nmt.vocab import (
     batch_totoken,
 )
 from nmt.dataset.data import (
+    tolist,
     numerical,
     init_target,
 )
@@ -18,12 +19,13 @@ def predict(model, sents, src_vocab, tgt_vocab, device=None, pred_file=None,
             maxlen=10):
     model.eval()
     pred_seq = []
+    eos_idx = tgt_vocab.EOS_IDX
     for _, sent in enumerate(sents):
         src, src_len = numerical([sent], src_vocab, maxlen, device)
         sos, sos_len = init_target(src.shape[0], src_vocab, maxlen, device)
-        out = model(src, src_len, sos, sos_len, teacher_ratio=0)
-        pred = out.argmax(2).tolist()
-        pred_seq.extend(batch_totoken(pred, tgt_vocab, strip_eos=True))
+        pred, lens = model.predict(src, src_len, sos, sos_len, eos_idx, maxlen)
+        pred_lst = tolist(pred, lens)
+        pred_seq.extend(batch_totoken(pred_lst, tgt_vocab))
     with open(pred_file, 'w', encoding='utf-8') as wf:
         for (sent, pred) in zip(sents, pred_seq):
             wf.write(' '.join(sent) + '\t' + ' '.join(pred) + '\n')

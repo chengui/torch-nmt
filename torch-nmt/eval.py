@@ -1,6 +1,9 @@
 from torch import nn
 from torch.utils.data import DataLoader
-from nmt.dataset.data import init_target
+from nmt.dataset.data import (
+    tolist,
+    init_target
+)
 from nmt.dataset import create_dataset
 from nmt.vocab import (
     load_vocab,
@@ -34,14 +37,15 @@ def evaluate_loss(model, data_iter, criterion, device):
 def evaluate_bleu(model, data_iter, vocab, device, maxlen):
     model.eval()
     cnd_seq, ref_seq = [], []
+    eos_idx = vocab.EOS_IDX
     for _, batch in enumerate(data_iter):
         src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
-        tgt, gold = tgt[:, :-1], tgt[:, 1:]
-        sos, sos_len = init_target(src.shape[0], src_vocab, maxlen)
-        sos, sos_len = sos.to(device), sos_len.to(device)
-        out = model(src, src_len, sos, sos_len, teacher_ratio=0)
-        cnd_seq.extend(batch_totoken(out.argmax(2).tolist(), vocab))
-        ref_seq.extend(batch_totoken(gold.tolist(), vocab, unsqueeze=True))
+        sos, sos_len = init_target(src.shape[0], src_vocab, maxlen, device)
+        pred, lens = model.predict(src, src_len, sos, sos_len, eos_idx, maxlen)
+        cnd_seq.extend(batch_totoken(
+            tolist(pred, lens), vocab, padding_eos=True))
+        ref_seq.extend(batch_totoken(
+            tolist(tgt[:, 1:], tgt_len-1), vocab, unsqueeze=True))
     return bleu_score(cnd_seq, ref_seq)
 
 def evaluate(model, dataset, vocab, device=None, batch_size=32, max_length=10):
