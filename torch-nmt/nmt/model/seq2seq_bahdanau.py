@@ -172,6 +172,8 @@ class BahdanauSeq2Seq(nn.Module):
             pred = out.argmax(2)
             preds.append(pred)
             # pred: (batch, 1)
+            if all(pred_lens.le(t)):
+                break
             indics = pred_lens.gt(t) & pred.squeeze(1).eq(eos_idx)
             pred_lens[indics] = t
         return torch.cat(preds, dim=-1), pred_lens

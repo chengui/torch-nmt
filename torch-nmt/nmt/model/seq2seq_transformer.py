@@ -238,6 +238,8 @@ class TransformerSeq2Seq(nn.Module):
             # outs: (batch, 1, dec_vocab)
             pred = outs.argmax(2)
             # pred: (batch, 1)
+            if all(pred_len.le(t)):
+                break
             indics = pred_len.gt(t) & pred[:,-1].eq(eos_idx)
             pred_len[indics] = t
         return pred, pred_len
