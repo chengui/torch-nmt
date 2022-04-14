@@ -198,7 +198,7 @@ class TransformerSeq2Seq(nn.Module):
             # enc_o: (batch, seqlen, hidden)
             outs = self.decoder(dec_x, state, dec_mask, enc_mask)
         else:
-            bs, ls = dec_x.shape
+            (bs, ls), dev = dec_x.shape, dec_x.device
             enc_mask = self.make_enc_mask(enc_x, enc_len)
             # enc_mask: (batch, 1, 1, srclen)
             state = self.encoder(enc_x, enc_mask)
@@ -206,11 +206,11 @@ class TransformerSeq2Seq(nn.Module):
             x_t, pred = [], None
             for t in range(ls):
                 if pred is None or (random.random() < teacher_ratio):
-                    x_t.append(dec_x[:, t].unsqueeze(1))
+                    x_t.append(dec_x[:, t])
                 else:
-                    x_t.append(pred[:, -1].unsqueeze(1))
-                x = torch.cat(x_t, dim=-1).to(dec_x.device)
-                x_len = (t+1) * torch.ones(bs).long().to(x.device)
+                    x_t.append(pred[:, -1])
+                x = torch.stack(x_t, dim=-1).to(dev)
+                x_len = (t+1) * torch.ones(bs).long().to(dev)
                 dec_mask = self.make_dec_mask(x, x_len)
                 outs = self.decoder(x, state, dec_mask, enc_mask)
                 # outs: (batch, outlen, vocab)
