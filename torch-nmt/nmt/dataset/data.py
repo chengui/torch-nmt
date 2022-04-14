@@ -14,11 +14,15 @@ def tolist(x, x_len=None):
     if x_len is None:
         return x.tolist()
     s = []
-    for i in range(x.shape[0]):
-        si = []
-        for j in range(x.shape[1]):
-            si.append(x[i,j,:x_len[i,j]].tolist())
-        s.append(si)
+    if len(x.shape) == 2:
+        for i in range(x.shape[0]):
+            s.append(x[i,:x_len[i]].tolist())
+    else:
+        for i in range(x.shape[0]):
+            si = []
+            for j in range(x.shape[1]):
+                si.append(x[i,j,:x_len[i,j]].tolist())
+            s.append(si)
     return s
 
 def pad(sent, maxlen, pad_idx):

@@ -40,12 +40,11 @@ def evaluate_bleu(model, data_iter, vocab, device, maxlen):
     eos_idx = vocab.EOS_IDX
     for _, batch in enumerate(data_iter):
         src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
+        gold, gold_len = tgt[:, 1:].unsqueeze(1), tgt_len.unsqueeze(1)-1
         sos, sos_len = init_target(src.shape[0], src_vocab, maxlen, device)
         pred, lens = model.predict(src, src_len, sos, sos_len, eos_idx, maxlen)
-        cnd_seq.extend(batch_totoken(
-            tolist(pred, lens), vocab, padding_eos=True))
-        ref_seq.extend(batch_totoken(
-            tolist(tgt[:, 1:], tgt_len-1), vocab, unsqueeze=True))
+        cnd_seq.extend(batch_totoken(tolist(pred, lens), vocab, pad_eos=True))
+        ref_seq.extend(batch_totoken(tolist(gold, gold_len), vocab))
     return bleu_score(cnd_seq, ref_seq)
 
 def evaluate(model, dataset, vocab, device=None, batch_size=32, max_length=10):
