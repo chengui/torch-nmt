@@ -1,4 +1,5 @@
 import os
+import torch
 from nmt.util import get_device
 from nmt.config import Config
 from nmt.vocab import (
@@ -16,6 +17,7 @@ from nmt.model import (
 )
 
 
+@torch.no_grad()
 def predict(model, sents, src_vocab, tgt_vocab, device=None, beam=None,
             pred_file=None, maxlen=10):
     model.eval()

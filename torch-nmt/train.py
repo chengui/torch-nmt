@@ -16,21 +16,21 @@ from nmt.model import (
 )
 
 
+@torch.no_grad()
 def valid_epoch(model, data_iter, criterion, device):
     model.eval()
-    with torch.no_grad():
-        valid_loss = 0
-        for idx, batch in enumerate(data_iter):
-            src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
-            tgt, gold = tgt[:, :-1], tgt[:, 1:]
-            pred = model(src, src_len, tgt, tgt_len)
-            # pred: (batch, seqlen, vocab)
-            # gold: (batch, seq)
-            pred = pred.permute(0, 2, 1)
-            loss = criterion(pred, gold)
-            valid_loss += loss
-        valid_loss /= len(data_iter)
-        return valid_loss
+    valid_loss = 0
+    for idx, batch in enumerate(data_iter):
+        src, src_len, tgt, tgt_len = [i.to(device) for i in batch]
+        tgt, gold = tgt[:, :-1], tgt[:, 1:]
+        pred = model(src, src_len, tgt, tgt_len)
+        # pred: (batch, seqlen, vocab)
+        # gold: (batch, seq)
+        pred = pred.permute(0, 2, 1)
+        loss = criterion(pred, gold)
+        valid_loss += loss
+    valid_loss /= len(data_iter)
+    return valid_loss
 
 def train_epoch(model, data_iter, criterion, optimizer, scheduler, device):
     model.train()

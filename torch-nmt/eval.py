@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from nmt.dataset import create_dataset
@@ -20,6 +21,7 @@ from nmt.model import (
 )
 
 
+@torch.no_grad()
 def evaluate_loss(model, data_iter, criterion, device):
     model.eval()
     test_loss = 0
@@ -35,6 +37,7 @@ def evaluate_loss(model, data_iter, criterion, device):
     test_loss /= len(data_iter)
     return test_loss
 
+@torch.no_grad()
 def evaluate_bleu(model, data_iter, vocab, device, maxlen):
     model.eval()
     cnd_seq, ref_seq = [], []
