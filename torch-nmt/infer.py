@@ -56,14 +56,14 @@ if __name__ == '__main__':
                         help='maxium length to predict')
     parser.add_argument('-b', '--beam-size', type=int, default=None,
                         help='beam size used in beam search')
-    parser.add_argument('--cpu-only', action='store_true',
-                        help='whether work on cpu only')
+    parser.add_argument('--onlycpu', action='store_true',
+                        help='whether only work on cpu')
     args = parser.parse_args()
 
     conf = Config.load_config(args.config)
 
     src_vocab, tgt_vocab = load_vocab(args.work_dir)
-    device = get_device(args.cpu_only)
+    device = get_device(args.onlycpu)
     model = create_model(enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab),
                          **conf.model)

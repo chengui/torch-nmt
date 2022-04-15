@@ -73,8 +73,8 @@ if __name__ == '__main__':
                         help='batch size of dataloader')
     parser.add_argument('-l', '--max-length', type=int, default=10,
                         help='maxium length to predict')
-    parser.add_argument('--cpu-only', action='store_true',
-                        help='whether work on cpu only')
+    parser.add_argument('--onlycpu', action='store_true',
+                        help='whether only work on cpu')
     args = parser.parse_args()
 
     conf = Config.load_config(args.config)
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     test_set, = create_dataset(args.work_dir,
                                vocab=(src_vocab, tgt_vocab),
                                split=('test',))
-    device = get_device(args.cpu_only)
+    device = get_device(args.onlycpu)
     model = create_model(enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab),
                          **conf.model)

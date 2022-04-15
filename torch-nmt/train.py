@@ -103,10 +103,10 @@ if __name__ == '__main__':
                         help='batch size of mini-batch')
     parser.add_argument('-l', '--learning-rate', type=float, default=0.001,
                         help='learning rate of training')
-    parser.add_argument('--warmup-steps', type=int, default=0,
+    parser.add_argument('--warmup', type=int, default=0,
                         help='warmup steps of training')
-    parser.add_argument('--cpu-only', action='store_true',
-                        help='whether work on cpu only')
+    parser.add_argument('--onlycpu', action='store_true',
+                        help='whether only work on cpu')
     parser.add_argument('--checkpoint', action='store_true',
                         help='whether use checkpoint in working dir')
     args = parser.parse_args()
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     train_set, valid_set = create_dataset(args.work_dir,
                                           vocab=(src_vocab, tgt_vocab),
                                           split=('train', 'valid'))
-    device = get_device(args.cpu_only)
+    device = get_device(args.onlycpu)
     model = create_model(enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab),
                          **conf.model)
@@ -129,5 +129,5 @@ if __name__ == '__main__':
           num_epochs=args.num_epochs,
           batch_size=args.batch_size,
           learning_rate=args.learning_rate,
-          warmup_steps=args.warmup_steps,
+          warmup_steps=args.warmup,
           checkpoint=args.checkpoint)
