@@ -1,5 +1,6 @@
 import os
 from nmt.util import get_device
+from nmt.config import Config
 from nmt.vocab import (
     load_vocab,
     batch_totoken,
@@ -43,8 +44,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model-type', required=True,
-                        help='model type to use')
+    parser.add_argument('-c', '--config', required=True,
+                        help='configure file for model')
     parser.add_argument('-w', '--work-dir', required=True,
                         help='working dir to output')
     parser.add_argument('-f', '--source-file', required=True,
@@ -57,11 +58,13 @@ if __name__ == '__main__':
                         help='whether work on cpu only')
     args = parser.parse_args()
 
+    conf = Config.load_config(args.config)
+
     src_vocab, tgt_vocab = load_vocab(args.work_dir)
     device = get_device(args.cpu_only)
-    model = create_model(model_type=args.model_type,
-                         enc_vocab=len(src_vocab),
-                         dec_vocab=len(tgt_vocab))
+    model = create_model(enc_vocab=len(src_vocab),
+                         dec_vocab=len(tgt_vocab),
+                         **conf.model)
     model = model.to(device)
     load_ckpt(args.work_dir, model, None, mode='best')
 
