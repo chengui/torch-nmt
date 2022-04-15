@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from nmt.dataset import create_dataset
+from nmt.workdir import WorkDir
 from nmt.config import Config
 from nmt.dataset.data import (
     tolist,
@@ -77,10 +78,11 @@ if __name__ == '__main__':
                         help='whether only work on cpu')
     args = parser.parse_args()
 
+    wdir = WorkDir(args.work_dir)
     conf = Config.load_config(args.config)
 
-    src_vocab, tgt_vocab = load_vocab(args.work_dir)
-    test_set, = create_dataset(args.work_dir,
+    src_vocab, tgt_vocab = load_vocab(wdir.vocab)
+    test_set, = create_dataset(data_dir=wdir.data,
                                vocab=(src_vocab, tgt_vocab),
                                split=('test',))
     device = get_device(args.onlycpu)
@@ -89,7 +91,7 @@ if __name__ == '__main__':
                          **conf.model)
     model = model.to(device)
 
-    load_ckpt(args.work_dir, model, None, mode='best')
+    load_ckpt(wdir.model, model, None, mode='best')
     evaluate(model, test_set, tgt_vocab,
              device=device,
              batch_size=args.batch_size,

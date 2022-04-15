@@ -1,6 +1,6 @@
-import os
 import torch
 from nmt.util import get_device
+from nmt.workdir import WorkDir
 from nmt.config import Config
 from nmt.vocab import (
     load_vocab,
@@ -60,23 +60,20 @@ if __name__ == '__main__':
                         help='whether only work on cpu')
     args = parser.parse_args()
 
+    wdir = WorkDir(args.work_dir)
     conf = Config.load_config(args.config)
 
-    src_vocab, tgt_vocab = load_vocab(args.work_dir)
+    src_vocab, tgt_vocab = load_vocab(wdir.vocab)
     device = get_device(args.onlycpu)
     model = create_model(enc_vocab=len(src_vocab),
                          dec_vocab=len(tgt_vocab),
                          **conf.model)
     model = model.to(device)
-    load_ckpt(args.work_dir, model, None, mode='best')
+    load_ckpt(wdir.model, model, None, mode='best')
 
-    with open(args.source_file, 'r') as f:
+    with open(wdir.test.rfile(args.source_file), 'r') as f:
         sents = [l.strip().split(' ') for l in f]
-    out_dir = os.path.join(args.work_dir, 'out')
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    pred_name = os.path.basename(args.source_file) + '.pred'
-    pred_file = os.path.join(out_dir, pred_name)
+    pred_file = wdir.out.file(f'{args.source_file}.pred')
     predict(model, sents, src_vocab, tgt_vocab,
             device=device,
             beam=args.beam_size,

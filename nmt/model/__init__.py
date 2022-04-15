@@ -1,4 +1,3 @@
-import os
 import torch
 from nmt.model.seq2seq_rnn import RNNSeq2Seq
 from nmt.model.seq2seq_luong import LuongSeq2Seq
@@ -37,25 +36,15 @@ def init_weights(m):
             if 'weight' in name and param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param.data)
 
-def load_ckpt(work_dir, model, optimizer=None, mode='last'):
-    model_dir = os.path.join(work_dir, 'model')
-    if not os.path.exists(model_dir):
-        raise OSError(f'model dir not exits: {work_dir}')
-    model_file = os.path.join(model_dir, f'checkpoint-{mode}.pt')
-    if not os.path.exists(model_file):
-        raise OSError(f'checkpoint not exists: {work_dir}')
-    checkpoint = torch.load(model_file)
+def load_ckpt(model_dir, model, optimizer=None, mode='last'):
+    checkpoint = torch.load(model_dir.rfile(f'checkpoint-{mode}.pt'))
     model.load_state_dict(checkpoint['model'])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optim'])
 
-def save_ckpt(work_dir, model, optimizer, mode='last'):
-    model_dir = os.path.join(work_dir, 'model')
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    model_file = os.path.join(model_dir, f'checkpoint-{mode}.pt')
-    checkpoint = {
-        'model': model.state_dict(),
-        'optim': optimizer.state_dict(),
-    }
-    torch.save(checkpoint, model_file)
+def save_ckpt(model_dir, model, optimizer=None, mode='last'):
+    checkpoint = {}
+    checkpoint['model'] = model.state_dict()
+    if optimizer is not None:
+        checkpoint['optim'] = optimizer.state_dict()
+    torch.save(checkpoint, model_dir.file(f'checkpoint-{mode}.pt'))

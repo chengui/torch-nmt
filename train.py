@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from nmt.dataset import create_dataset
 from nmt.optim import NoamScheduler
 from nmt.vocab import load_vocab
+from nmt.workdir import WorkDir
 from nmt.config import Config
 from nmt.util import (
     clip_grad,
@@ -54,7 +55,7 @@ def train_epoch(model, data_iter, criterion, optimizer, scheduler, device):
     return train_loss
 
 def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
-          work_dir=None, num_epochs=10, batch_size=32, learning_rate=0.001,
+          model_dir=None, num_epochs=10, batch_size=32, learning_rate=0.001,
           warmup_steps=400, checkpoint=False):
     train_iter = DataLoader(dataset=train_set,
                             batch_size=batch_size,
@@ -69,7 +70,7 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
     scheduler = NoamScheduler(optimizer, warmup_steps)
 
     if checkpoint:
-        load_ckpt(work_dir, model, optimizer)
+        load_ckpt(model_dir, model, optimizer)
 
     train_hist, valid_hist = [], []
     for epoch in range(num_epochs):
@@ -80,10 +81,10 @@ def train(model, train_set, valid_set, src_vocab, tgt_vocab, device=None,
         train_hist.append(train_loss)
         valid_hist.append(valid_loss)
 
-        if work_dir is not None:
-            save_ckpt(work_dir, model, optimizer, mode='last')
+        if model_dir is not None:
+            save_ckpt(model_dir, model, optimizer, mode='last')
         if valid_loss <= min(valid_hist):
-            save_ckpt(work_dir, model, optimizer, mode='best')
+            save_ckpt(model_dir, model, optimizer, mode='best')
 
         print(f'epoch {epoch+1}: train_loss={train_loss:>3f}, '
               f'valid_loss={valid_loss:>3f}')
@@ -111,10 +112,11 @@ if __name__ == '__main__':
                         help='whether use checkpoint in working dir')
     args = parser.parse_args()
 
+    wdir = WorkDir(args.work_dir)
     conf = Config.load_config(args.config)
 
-    src_vocab, tgt_vocab = load_vocab(args.work_dir)
-    train_set, valid_set = create_dataset(args.work_dir,
+    src_vocab, tgt_vocab = load_vocab(wdir.vocab)
+    train_set, valid_set = create_dataset(data_dir=wdir.data,
                                           vocab=(src_vocab, tgt_vocab),
                                           split=('train', 'valid'))
     device = get_device(args.onlycpu)
@@ -125,7 +127,7 @@ if __name__ == '__main__':
 
     train(model, train_set, valid_set, src_vocab, tgt_vocab,
           device=device,
-          work_dir=args.work_dir,
+          model_dir=wdir.model,
           num_epochs=args.num_epochs,
           batch_size=args.batch_size,
           learning_rate=args.learning_rate,
