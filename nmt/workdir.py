@@ -4,6 +4,12 @@ class SubDir(object):
     def __init__(self, root='.'):
         self.root = root
 
+    def __str__(self):
+        return str(self.root)
+
+    def sub(self, d):
+        return subdir(self.dir(d))
+
     def dir(self, d):
         d = os.path.join(self.root, d)
         if not os.path.exists(d):
@@ -43,3 +49,5 @@ class WorkDir(SubDir):
     @property
     def out(self):
         return SubDir(self.dir('out'))
+
+subdir = lambda d: SubDir(d)

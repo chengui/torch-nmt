@@ -91,7 +91,8 @@ if __name__ == '__main__':
                          **conf.model)
     model = model.to(device)
 
-    load_ckpt(wdir.model, model, None, mode='best')
+    model_dir = wdir.model.sub(conf.model.type)
+    load_ckpt(model_dir, model, None, mode='best')
     evaluate(model, test_set, tgt_vocab,
              device=device,
              batch_size=args.batch_size,

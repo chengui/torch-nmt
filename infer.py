@@ -40,6 +40,7 @@ def predict(model, sents, src_vocab, tgt_vocab, device=None, beam=None,
         for (sent, preds) in zip(sents, pred_seq):
             for pred in preds:
                 wf.write(' '.join(sent) + '\t' + ' '.join(pred) + '\n')
+        print(f'Predicted result stores at {pred_file}')
 
 
 if __name__ == '__main__':
@@ -69,7 +70,9 @@ if __name__ == '__main__':
                          dec_vocab=len(tgt_vocab),
                          **conf.model)
     model = model.to(device)
-    load_ckpt(wdir.model, model, None, mode='best')
+
+    model_dir = wdir.model.sub(conf.model.type)
+    load_ckpt(model_dir, model, None, mode='best')
 
     with open(wdir.test.rfile(args.source_file), 'r') as f:
         sents = [l.strip().split(' ') for l in f]

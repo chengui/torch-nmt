@@ -125,9 +125,10 @@ if __name__ == '__main__':
                          **conf.model)
     model = model.to(device)
 
+    model_dir = wdir.model.sub(conf.model.type)
     train(model, train_set, valid_set, src_vocab, tgt_vocab,
           device=device,
-          model_dir=wdir.model,
+          model_dir=model_dir,
           num_epochs=args.num_epochs,
           batch_size=args.batch_size,
           learning_rate=args.learning_rate,
