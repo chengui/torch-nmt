@@ -51,6 +51,8 @@ if __name__ == '__main__':
                         help='configure file for model')
     parser.add_argument('-w', '--work-dir', required=True,
                         help='working dir to output')
+    parser.add_argument('-m', '--model-type', default=None,
+                        help='model type to use')
     parser.add_argument('-f', '--source-file', required=True,
                         help='source file with preprocessed data')
     parser.add_argument('-l', '--max-length', type=int, default=10,
@@ -63,6 +65,8 @@ if __name__ == '__main__':
 
     wdir = WorkDir(args.work_dir)
     conf = Config.load_config(args.config)
+    if args.model_type:
+        conf.model.update({'type': args.model_type})
 
     src_vocab, tgt_vocab = load_vocab(wdir.vocab)
     device = get_device(args.onlycpu)

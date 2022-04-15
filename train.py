@@ -98,6 +98,8 @@ if __name__ == '__main__':
                         help='configure file for model')
     parser.add_argument('-w', '--work-dir', required=True,
                         help='working dir to perform')
+    parser.add_argument('-m', '--model-type', default=None,
+                        help='model type to use')
     parser.add_argument('-n', '--num-epochs', type=int, default=10,
                         help='number of training epochs')
     parser.add_argument('-b', '--batch-size', type=int, default=32,
@@ -114,6 +116,8 @@ if __name__ == '__main__':
 
     wdir = WorkDir(args.work_dir)
     conf = Config.load_config(args.config)
+    if args.model_type:
+        conf.model.update({'type': args.model_type})
 
     src_vocab, tgt_vocab = load_vocab(wdir.vocab)
     train_set, valid_set = create_dataset(data_dir=wdir.data,
