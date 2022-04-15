@@ -1,0 +1,31 @@
+---
+model:
+  type: rnn
+  params:
+    rnn:
+      n_hiddens: 64
+      n_embed: 32
+      n_layers: 1
+      dropout: 0
+    bahdanau:
+      n_hiddens: 512
+      enc_embed: 256
+      dec_embed: 256
+      use_birnn: false
+      n_layers: 1
+      dropout: 0
+    luong:
+      n_hiddens: 512
+      enc_embed: 256
+      dec_embed: 256
+      use_birnn: false
+      score_fn: dot
+      n_layers: 1
+      dropout: 0
+    transformer:
+      n_heads: 8
+      n_layers: 6
+      n_hiddens: 512
+      ff_hiddens: 2048
+      n_position: 100
+      dropout: 0
