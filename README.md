@@ -1,14 +1,13 @@
-# Torch Samples
+# torch-nmt
 
-## Basic
+## Brief
 
-### Linear Regression
+## Structure
 
-### Logistic Regression
+## Usage
 
-### Dense Net
+### Train
 
-### CNN Net
+### Evaluate
 
-### RNN Net
-
+### Inference
