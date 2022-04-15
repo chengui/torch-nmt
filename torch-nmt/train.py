@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from nmt.dataset import create_dataset
 from nmt.optim import NoamScheduler
 from nmt.vocab import load_vocab
+from nmt.config import Config
 from nmt.util import (
     clip_grad,
     get_device,
@@ -92,8 +93,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model-type', required=True,
-                        help='model type to use')
+    parser.add_argument('-c', '--config', required=True,
+                        help='configure file for model')
     parser.add_argument('-w', '--work-dir', required=True,
                         help='working dir to perform')
     parser.add_argument('-n', '--num-epochs', type=int, default=10,
@@ -110,14 +111,16 @@ if __name__ == '__main__':
                         help='whether use checkpoint in working dir')
     args = parser.parse_args()
 
+    conf = Config.load_config(args.config)
+
     src_vocab, tgt_vocab = load_vocab(args.work_dir)
     train_set, valid_set = create_dataset(args.work_dir,
                                           vocab=(src_vocab, tgt_vocab),
                                           split=('train', 'valid'))
     device = get_device(args.cpu_only)
-    model = create_model(model_type=args.model_type,
-                         enc_vocab=len(src_vocab),
-                         dec_vocab=len(tgt_vocab))
+    model = create_model(enc_vocab=len(src_vocab),
+                         dec_vocab=len(tgt_vocab),
+                         **conf.model)
     model = model.to(device)
 
     train(model, train_set, valid_set, src_vocab, tgt_vocab,
