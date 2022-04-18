@@ -1,4 +1,17 @@
 ---
+transforms:
+  pipe:
+  - word_tokenize
+  - filter_too_long
+  - vocab_numerical
+  - to_tensor
+  params:
+    filter_too_long:
+      src_max_len: 10
+      tgt_max_len: 10
+    vocab_numerical:
+      src_vocab: src_vocab.txt
+      tgt_vocab: tgt_vocab.txt
 model:
   type: rnn
   params:
