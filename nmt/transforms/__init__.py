@@ -22,7 +22,7 @@ TRANSFORMS = {
     'to_tensor': ToTensor,
 }
 
-def load_transforms(pipe, params):
+def create_transforms(pipe, params):
     compose = []
     for p in pipe:
         transform = TRANSFORMS[p]
