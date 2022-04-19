@@ -1,15 +1,20 @@
 ---
+vocab:
+  src_vocab: src_vocab.txt
+  tgt_vocab: tgt_vocab.txt
+  max_size: 1000
+  min_freq: 2
 transforms:
   pipe:
   - word_tokenize
-  - filter_too_long
-  - vocab_numerical
+  - toolong_filter
+  - tok2idx_vocab
   - to_tensor
   params:
-    filter_too_long:
-      src_max_len: 10
-      tgt_max_len: 10
-    vocab_numerical:
+    toolong_filter:
+      max_srclen: 10
+      max_tgtlen: 10
+    tok2idx_vocab:
       src_vocab: src_vocab.txt
       tgt_vocab: tgt_vocab.txt
 model:
