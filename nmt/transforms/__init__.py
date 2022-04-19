@@ -7,6 +7,7 @@ from nmt.transforms.tokenize import (
 )
 from nmt.transforms.filter import (
     TooLongFilter,
+    TooShortFilter,
 )
 from nmt.transforms.vocab import (
     Tok2idxVocab,
@@ -18,6 +19,7 @@ TRANSFORMS = {
     'word_tokenize': WordTokenize,
     'spacy_tokenize': SpacyTokenize,
     'toolong_filter': TooLongFilter,
+    'tooshort_filter': TooShortFilter,
     'tok2idx_vocab': Tok2idxVocab,
     'idx2tok_vocab': Idx2tokVocab,
     'to_tensor': ToTensor,
