@@ -11,9 +11,15 @@ from nmt.vocab import (
 )
 
 
-def preprocess(corpus, transforms, splits, ratios, work_dir):
-    corpus = transforms.apply(corpus)
-    subsets = corpus.split(splits, ratios)
+def preprocess(corpus, transforms, vocab_opts, splits, ratios, work_dir):
+    vocab_transforms, pipe_transforms = create_transforms(**transforms)
+    corpus = corpus.apply(vocab_transforms)
+    vocab = build_vocab(corpus, **vocab_opts)
+    save_vocab(work_dir.vocab, vocab['src'], vocab['tgt'])
+
+    pipe_transforms.warmup(vocab)
+    corpus = corpus.apply(pipe_transforms)
+    subsets = corpus.split(ratios)
     save_transforms(work_dir.data, subsets, splits)
 
 
@@ -43,8 +49,4 @@ if __name__ == '__main__':
     ratios = list(map(float, args.ratios.split(',')))
 
     corpus = create_corpus(wdir.corpus, lang_pair, args.corpus_type)
-    vocab = build_vocab(corpus, **conf.vocab)
-    save_vocab(wdir.vocab, vocab)
-
-    transforms = create_transforms(vocab, conf.transforms)
-    preprocess(corpus, transforms, splits, ratios, wdir)
+    preprocess(corpus, conf.transforms, conf.vocab, splits, ratios, wdir)
