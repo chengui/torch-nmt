@@ -1,14 +1,14 @@
 from nmt.transforms.transform import Transform
 
 
-class FilterTooLongTransform(Transform):
-    def __init__(self, src_max_len=None, tgt_max_len=None):
+class TooLongFilter(Transform):
+    def __init__(self, max_srclen=None, max_tgtlen=None):
         super().__init__()
-        self.src_max_len = src_max_len
-        self.tgt_max_len = tgt_max_len
+        self.max_srclen = max_srclen
+        self.max_tgtlen = max_tgtlen
 
     def forward(self, input):
-        if (len(input['src']) > self.src_max_len or
-            len(input('tgt')) > self.tgt_max_len):
+        if (len(input['src']) > self.max_srclen or
+            len(input('tgt')) > self.max_tgtlen):
             return None
         return input

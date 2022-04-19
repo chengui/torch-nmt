@@ -8,19 +8,21 @@ class WordTokenizeTransform(Transform):
         self.sep = sep
 
     def forward(self, input):
-        return input.split(self.sep)
+        input['src'] = input['src'].split(self.sep)
+        input['tgt'] = input['tgt'].split(self.sep)
+        return input
 
 class SpacyTokenizeTransform(Transform):
-    models = {
-        'en': 'en_core_news_sm',
-        'de': 'en_core_web_sm',
-    }
+    models = spacy.errors.OLD_MODEL_SHORTCUTS
 
-    def __init__(self, lang='en'):
+    def __init__(self, src_lang, tgt_lang):
         super().__init__()
-        if lang not in self.models:
-            raise KeyError(f'unsupported language: {lang}')
-        self.nlp = spacy.load(self.models[lang])
+        self.src_nlp = spacy.load(self.models[src_lang])
+        self.tgt_nlp = spacy.load(self.models[tgt_lang])
+        self.src_tok = self.src_nlp.tokenizer
+        self.tgt_tok = self.tgt_nlp.tokenizer
 
     def forward(self, input):
-        return [tok.text for tok in self.nlp.tokenizer(input)]
+        input['src'] = [tok.text for tok in self.src_tok(input['src'])]
+        input['tgt'] = [tok.text for tok in self.tgt_tok(input['tgt'])]
+        return input
