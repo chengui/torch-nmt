@@ -1,34 +1,51 @@
-import torch
-from nmt.transforms import create_transforms
+from nmt.corpus import create_corpus
+from nmt.workdir import WorkDir
+from nmt.config import Config
+from nmt.transforms import (
+    create_transforms,
+    save_transforms,
+)
+from nmt.vocab import (
+    save_vocab,
+    build_vocab,
+)
 
 
-def split_length(l, ratio):
-    pass
-
-def preprocess(corpus, pipes, params, data_dir):
-    if isinstance(pipes, (list, tuple)):
-        src_pipe, tgt_pipe = pipes
-    else:
-        src_pipe, tgt_pipe = pipes, pipes
-    src_transforms = create_transforms(src_pipe, params)
-    tgt_transforms = create_transforms(tgt_pipe, params)
-    src_samples, tgt_samples = [], []
-    for text in corpus:
-        src_samples.append(src_transform(text[0]))
-        tgt_samples.append(tgt_transform(text[1]))
-    lens = split_length(len(src_samples), [8, 1, 1])
-    for i, sp in enumerate(['train', 'valid', 'test']):
-        if i == 0:
-            beg, end = 0, lens[i]
-        else:
-            beg, end = lens[i-1]+1, lens[i]
-        state_dict = {
-            'src': src_samples[beg:end],
-            'tgt': tgt_samples[beg:end],
-        }
-        torch.save(state_dict, data_dir.file(f'{sp}.pkl'))
+def preprocess(corpus, transforms, splits, ratios, work_dir):
+    corpus = transforms.apply(corpus)
+    subsets = corpus.split(splits, ratios)
+    save_transforms(work_dir.data, subsets, splits)
 
 
 if __name__ == '__main__':
-    pass
+    import argparse
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', required=True,
+                        help='configure file for model')
+    parser.add_argument('-w', '--work-dir', required=True,
+                        help='working dir to perform')
+    parser.add_argument('-o', '--corpus-type', default=None,
+                        help='corpus type to use')
+    parser.add_argument('-s', '--src-lang', required=True,
+                        help='source language')
+    parser.add_argument('-t', '--tgt-lang', required=True,
+                        help='target language')
+    parser.add_argument('-p', '--splits', default='train,valid,test',
+                        help='splits to generate')
+    parser.add_argument('-r', '--ratios', default='0.8,0.1,0.1',
+                        help='splits ratio to use')
+    args = parser.parse_args()
+
+    wdir = WorkDir(args.work_dir)
+    conf = Config.load_config(args.config)
+
+    splits = args.splits.split(',')
+    ratios = list(map(float, args.ratios.split(',')))
+
+    corpus = create_corpus(wdir.corpus, args.corpus_type)
+    vocab = build_vocab(corpus, **conf.vocab)
+    save_vocab(wdir.vocab, vocab['src'], vocab['tgt'])
+
+    transforms = create_transforms(vocab, conf.transforms)
+    preprocess(corpus, transforms, splits, ratios, wdir)
