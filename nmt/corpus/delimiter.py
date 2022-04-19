@@ -11,6 +11,6 @@ class DelimiterCorpus(ParallelCorpus):
         with open(fpath, 'r', encoding='utf-8') as f:
             for ln in f:
                 s, t = ln.strip().split('\t')
-                src.append(s.split(' '))
-                tgt.append(t.split(' '))
+                src.append(s)
+                tgt.append(t)
         return src, tgt
