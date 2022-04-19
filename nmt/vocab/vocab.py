@@ -8,12 +8,13 @@ class Vocab(object):
     EOS_IDX, EOS_TOK = 3, '<eos>'
 
     def __init__(self, reserved_tokens=[]):
-        self.itos = [
+        self.reserved_tokens = [
             Vocab.UNK_TOK,
             Vocab.PAD_TOK,
             Vocab.SOS_TOK,
             Vocab.EOS_TOK,
         ] + reserved_tokens
+        self.itos = self.reserved_tokens
         self.stoi = {v: k for k, v in enumerate(self.itos)}
 
     def __len__(self):
@@ -22,13 +23,13 @@ class Vocab(object):
     def __getitem__(self, tokens):
         return self.index(tokens)
 
-    def build(self, tokens, min_freq=2):
+    def build(self, tokens, max_size, min_freq=2):
         if isinstance(tokens[0], list):
             tokens = [tok for line in tokens for tok in line]
         freqs = collections.Counter(tokens)
         freqs = sorted(freqs.items(), key=lambda x: x[1], reverse=True)
-        for tok, freq in freqs:
-            if freq < min_freq:
+        for cnt, (tok, freq) in enumerate(freqs):
+            if freq < min_freq or cnt >= max_size:
                 break
             self.stoi[tok] = len(self.itos)
             self.itos.append(tok)
@@ -55,7 +56,8 @@ class Vocab(object):
 
     def to_file(self, filename):
         with open(filename, 'w') as f:
-            f.write('\n'.join(self.itos))
+            rl = len(self.reserved_tokens)
+            f.write('\n'.join(self.itos[rl:]))
 
     @classmethod
     def from_file(cls, filename):
