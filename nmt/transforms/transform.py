@@ -6,27 +6,28 @@ class Transform(object):
     def warmup(self, vocab):
         self.vocab = vocab
 
+    def get_vocab(self):
+        return self.vocab
+
     def apply(self, inputs):
-        outs = []
+        outputs = []
         for input in inputs:
-            out = self.forward(input)
-            if out is not None:
-                outs.append(out)
-        return outs
+            output = self.forward(input)
+            if output is not None:
+                outputs.append(output)
+        return outputs
 
     def forward(self):
         raise NotImplementedError()
 
 class Compose(Transform):
-    def __init__(self, vocab, transforms=[]):
+    def __init__(self, transforms=[]):
         super().__init__()
-        self.vocab = vocab
         self.transforms = transforms
+
+    def warmup(self, vocab):
         for transform in self.transforms:
             transform.warmup(vocab)
-
-    def get_vocab(self):
-        return self.vocab
 
     def forward(self, input):
         for transform in self.transforms:

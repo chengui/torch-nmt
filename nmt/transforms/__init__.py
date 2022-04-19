@@ -26,12 +26,17 @@ TRANSFORMS = {
 }
 
 def create_transforms(vocab, pipe, params):
-    transforms = []
+    vocab_transforms = []
+    for p in vocab:
+        transform = TRANSFORMS[p]
+        param = params[p] if p in params else {}
+        vocab_transforms.append(transform(**param))
+    pipe_transforms = []
     for p in pipe:
         transform = TRANSFORMS[p]
         param = params[p] if p in params else {}
-        transforms.append(transform(**param))
-    return Compose(vocab, transforms)
+        pipe_transforms.append(transform(**param))
+    return Compose(vocab_transforms), Compose(pipe_transforms)
 
 def load_transforms(data_dir, splits):
     samples = []
@@ -39,7 +44,7 @@ def load_transforms(data_dir, splits):
         samples.append(torch.load(data_dir.file(f'{split}.pkl')))
     return samples
 
-def save_transforms(data_dir, samples, splits):
-    for (split, sample) in zip(splits, samples):
-        file = data_dir.wfile(f'{split}.pkl')
-        torch.save(samples, file)
+def save_transforms(data_dir, subsets, splits):
+    for (split, subset) in zip(splits, subsets):
+        file = data_dir.file(f'{split}.pkl')
+        torch.save(subset.dict(), file)

@@ -7,8 +7,8 @@ class Tok2idxVocab(Transform):
         self.tgt_vocab = vocab['tgt']
 
     def forward(self, input):
-        input['src'] = self.src_vocab.index[input['src']]
-        input['tgt'] = self.tgt_vocab.index[input['tgt']]
+        input['src'] = self.src_vocab.index(input['src'])
+        input['tgt'] = self.tgt_vocab.index(input['tgt'])
         return input
 
 class Idx2tokVocab(Transform):
@@ -17,6 +17,6 @@ class Idx2tokVocab(Transform):
         self.tgt_vocab = vocab['tgt']
 
     def forward(self, input):
-        input['src'] = self.src_vocab.token[input['src']]
-        input['tgt'] = self.tgt_vocab.token[input['tgt']]
+        input['src'] = self.src_vocab.token(input['src'])
+        input['tgt'] = self.tgt_vocab.token(input['tgt'])
         return input

@@ -9,7 +9,7 @@ class TooLongFilter(Transform):
 
     def forward(self, input):
         if (len(input['src']) > self.max_srclen or
-            len(input('tgt')) > self.max_tgtlen):
+            len(input['tgt']) > self.max_tgtlen):
             return None
         return input
 
@@ -21,6 +21,6 @@ class TooShortFilter(Transform):
 
     def forward(self, input):
         if (len(input['src']) < self.min_srclen or
-            len(input('tgt')) < self.min_tgtlen):
+            len(input['tgt']) < self.min_tgtlen):
             return None
         return input
