@@ -121,7 +121,6 @@ if __name__ == '__main__':
 
     src_vocab, tgt_vocab = load_vocab(wdir.vocab)
     train_set, valid_set = create_dataset(data_dir=wdir.data,
-                                          vocab=(src_vocab, tgt_vocab),
                                           split=('train', 'valid'))
     device = get_device(args.onlycpu)
     model = create_model(enc_vocab=len(src_vocab),

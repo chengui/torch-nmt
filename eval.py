@@ -87,7 +87,6 @@ if __name__ == '__main__':
 
     src_vocab, tgt_vocab = load_vocab(wdir.vocab)
     test_set, = create_dataset(data_dir=wdir.data,
-                               vocab=(src_vocab, tgt_vocab),
                                split=('test',))
     device = get_device(args.onlycpu)
     model = create_model(enc_vocab=len(src_vocab),
