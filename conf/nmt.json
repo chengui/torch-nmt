@@ -6,22 +6,26 @@
     "min_freq": 2
   },
   "transforms": {
-    "pipe": [
+    "vocab": [
       "word_tokenize",
-      "toolong_filter",
+      "toolong_filter"
+    ],
+    "pipe": [
       "tok2idx_vocab",
+      "boundtoken_vocab",
+      "add_len",
+      "padtoken_vocab",
       "to_tensor"
     ],
-    "params": [
+    "params": {
       "toolong_filter": {
         "max_srclen": 10,
         "max_tgtlen": 10
       },
-      "tok2idx_vocab": {
-        "src_vocab": "src_vocab.txt",
-        "tgt_vocab": "tgt_vocab.txt"
+      "padtoken_vocab": {
+        "max_len": 12
       }
-    ]
+    }
   },
   "model": {
     "type": "rnn",
