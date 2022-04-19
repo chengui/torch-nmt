@@ -31,6 +31,10 @@ class WorkDir(SubDir):
         super().__init__(root)
 
     @property
+    def corpus(self):
+        return SubDir(self.dir('corpus'))
+
+    @property
     def data(self):
         return SubDir(self.dir('data'))
 
