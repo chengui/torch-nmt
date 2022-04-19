@@ -1,6 +1,5 @@
 import torch
 from nmt.transforms.transform import Compose
-from nmt.transforms.tensor import ToTensor
 from nmt.transforms.tokenize import (
     WordTokenize,
     SpacyTokenize,
@@ -12,6 +11,12 @@ from nmt.transforms.filter import (
 from nmt.transforms.vocab import (
     Tok2idxVocab,
     Idx2tokVocab,
+    PadTokenVocab,
+    BoundTokenVocab,
+)
+from nmt.transforms.tensor import (
+    ToTensor,
+    AddLen,
 )
 
 
@@ -22,7 +27,10 @@ TRANSFORMS = {
     'tooshort_filter': TooShortFilter,
     'tok2idx_vocab': Tok2idxVocab,
     'idx2tok_vocab': Idx2tokVocab,
+    'padtoken_vocab': PadTokenVocab,
+    'boundtoken_vocab': BoundTokenVocab,
     'to_tensor': ToTensor,
+    'add_len': AddLen,
 }
 
 def create_transforms(vocab, pipe, params):
