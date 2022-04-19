@@ -14,7 +14,7 @@ class Vocab(object):
             Vocab.SOS_TOK,
             Vocab.EOS_TOK,
         ] + reserved_tokens
-        self.itos = self.reserved_tokens
+        self.itos = self.reserved_tokens[:]
         self.stoi = {v: k for k, v in enumerate(self.itos)}
 
     def __len__(self):
@@ -57,7 +57,7 @@ class Vocab(object):
     def to_file(self, filename):
         with open(filename, 'w') as f:
             rl = len(self.reserved_tokens)
-            f.write('\n'.join(self.itos[rl:]))
+            f.write('\n'.join(self.itos[rl:]) + '\n')
 
     @classmethod
     def from_file(cls, filename):
