@@ -23,13 +23,13 @@ TRANSFORMS = {
     'to_tensor': ToTensor,
 }
 
-def create_transforms(pipe, params):
-    compose = []
+def create_transforms(vocab, pipe, params):
+    transforms = []
     for p in pipe:
         transform = TRANSFORMS[p]
         param = params[p] if p in params else {}
-        compose.append(transform(**param))
-    return Compose(compose)
+        transforms.append(transform(**param))
+    return Compose(vocab, transforms)
 
 def load_transforms(data_dir, splits):
     samples = []
