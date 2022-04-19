@@ -23,8 +23,12 @@ class ParallelCorpus(object):
         return dct
 
     def apply(self, transforms):
-        for i, it in enumerate(self.state):
-            self.state[i] = transforms(it)
+        state = []
+        for it in self.state:
+            val = transforms(it)
+            if val is not None:
+                state.append(val)
+        self.state = state
         return self
 
     def split(self, ratios):
