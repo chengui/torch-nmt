@@ -1,4 +1,6 @@
 import torch
+from nmt.transforms.transform import Compose
+from nmt.transforms.tensor import ToTensor
 from nmt.transforms.tokenize import (
     WordTokenize,
     SpacyTokenize,
@@ -9,10 +11,6 @@ from nmt.transforms.filter import (
 from nmt.transforms.vocab import (
     Tok2idxVocab,
     Idx2tokVocab,
-)
-from nmt.transforms.transform import (
-    ToTensor,
-    Compose,
 )
 
 

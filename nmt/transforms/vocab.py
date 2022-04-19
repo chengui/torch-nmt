@@ -1,4 +1,4 @@
-from nmt.transforms.transforms import Transform
+from nmt.transforms.transform import Transform
 
 
 class Tok2idxVocab(Transform):

@@ -1,5 +1,5 @@
-from nmt.dataset.delimiter import DelimiterCorpus
-from nmt.dataset.separated import SeparatedCorpus
+from nmt.corpus.delimiter import DelimiterCorpus
+from nmt.corpus.separated import SeparatedCorpus
 
 CORPUS = {
     'delimiter': DelimiterCorpus,

@@ -2,7 +2,7 @@ import spacy
 from nmt.transforms.transform import Transform
 
 
-class WordTokenizeTransform(Transform):
+class WordTokenize(Transform):
     def __init__(self, sep=' '):
         super().__init__()
         self.sep = sep
@@ -12,7 +12,7 @@ class WordTokenizeTransform(Transform):
         input['tgt'] = input['tgt'].split(self.sep)
         return input
 
-class SpacyTokenizeTransform(Transform):
+class SpacyTokenize(Transform):
     models = spacy.errors.OLD_MODEL_SHORTCUTS
 
     def __init__(self, src_lang, tgt_lang):
