@@ -1,18 +1,19 @@
-from nmt.corpus.delimiter import DelimiterCorpus
-from nmt.corpus.separated import SeparatedCorpus
+from nmt.corpus.parallel import (
+    PairCorpus,
+    SingleCorpus,
+)
 
 CORPUS = {
-    'delimiter': DelimiterCorpus,
-    'separated': SeparatedCorpus,
+    'pair':   PairCorpus,
+    'single': SingleCorpus,
 }
 
-def create_corpus(corpus_dir, lang_pair, corpus_type='delimiter'):
-    Corpus = CORPUS.get(corpus_type, None)
-    if not Corpus:
-        raise ValueError(f'unsupported corpus format: {corpus_type}')
-    if corpus_type == 'delimiter':
-        merge_file = f'{lang_pair[0]}-{lang_pair[1]}.txt'
-        return Corpus(corpus_dir.rfile(merge_file))
+def create_corpus(corpus_dir, corpus_files):
+    if 'full' in corpus_files:
+        ful_files = corpus_files['full']
+        ful_files = [corpus_dir.rfile(f) for f in ful_files]
+        return [PairCorpus(split) for split in ful_files]
     else:
-        src_file, tgt_file = f'{lang_pair[0]}.txt', f'{lang_pair[1]}.txt'
-        return Corpus(corpus_dir.rfile(src_file), corpus_dir.rfile(tgt_file))
+        zip_files = zip(corpus_files['source'], corpus_files['target'])
+        zip_files = [corpus_dir.rfile(f) for f in zip_files]
+        return [SingleCorpus(src, tgt) for (src, tgt) in zip_files]

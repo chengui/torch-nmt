@@ -38,17 +38,28 @@ class ParallelCorpus(Dataset):
         self.data = data
         return self
 
-    def split(self, ratios):
-        l = [int(r * len(self.data)) for r in ratios]
-        splits, off = [], 0
-        for i in range(len(l)):
-            if i == len(l) - 1:
-                splits.append(self.data[off:])
-            else:
-                splits.append(self.data[off:off+l[i]])
-        return [SubsetCorpus(sp) for sp in splits]
+class PairCorpus(ParallelCorpus):
+    def __init__(self, full_pair, **kw):
+        data = self.read_pair(full_pair)
+        super().__init__(data)
 
-class SubsetCorpus(ParallelCorpus):
-    def __init__(self, data):
-        super().__init__()
-        self.data = data
+    def read_pair(self, fpath, sep='\t'):
+        data = []
+        with open(fpath, 'r', encoding='utf-8') as f:
+            for ln in f:
+                src, tgt = ln.strip().split(sep)
+                item = {'src': src, 'tgt': tgt}
+                data.append(item)
+        return data
+
+class SingleCorpus(ParallelCorpus):
+    def __init__(self, src_single, tgt_single, **kw):
+        zipp = zip(self.read_single(src_single), self.read_single(tgt_single))
+        data = [{'src': src, 'tgt': tgt} for (src, tgt) in zipp]
+        super().__init__(data)
+
+    def read_single(self, fpath):
+        lns = []
+        with open(fpath, 'r', encoding='utf-8') as f:
+            lns = [ln.strip() for ln in f]
+        return lns
